@@ -59,6 +59,13 @@ class BibleRepositoryTest {
     }
 
     @Test
+    fun nltIsAvailableOnline() {
+        assertTrue(BibleVersion.NLT.onlineAvailable)
+        assertEquals("NLT", BibleVersion.NLT.onlineSlug)
+        assertTrue(BibleVersion.NLT.copyrightNotice!!.contains("Tyndale"))
+    }
+
+    @Test
     fun canonIncludesFullProtestantBible() {
         assertEquals(66, BibleCanon.books.size)
         assertEquals(43, BibleCanon.bookId("John"))

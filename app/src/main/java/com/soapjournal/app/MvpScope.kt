@@ -3,6 +3,7 @@ package com.soapjournal.app
 /**
  * Product scope notes:
  * - Preferred online version: CSB (fetched remotely when online; not bundled).
+ * - Also online: NLT (fetched remotely when selected; not bundled).
  * - Offline Bible text: public-domain KJV corpus (VOTD + fallback chapters).
  * - Other modern versions (ESV/NIV/etc.): selectable; licensed feeds not wired yet.
  * - Sync: still local-only; accountability uses Android share intents.
@@ -10,6 +11,7 @@ package com.soapjournal.app
 object MvpScope {
     const val EMBEDDED_KJV = true
     const val ONLINE_CSB = true
+    const val ONLINE_NLT = true
     const val LICENSED_VERSION_FEEDS = false
     const val CLOUD_SYNC = false
 }

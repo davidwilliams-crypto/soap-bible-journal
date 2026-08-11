@@ -15,7 +15,12 @@ enum class BibleVersion(
     ),
     ESV("ESV", false),
     NIV("NIV", false),
-    NLT("NLT", false),
+    NLT(
+        displayName = "NLT",
+        offlineAvailable = false,
+        onlineSlug = "NLT",
+        copyrightNotice = "Scripture quotations marked NLT are taken from the Holy Bible, New Living Translation, copyright © 1996, 2004, 2015 by Tyndale House Foundation. Used by permission of Tyndale House Publishers, Inc., Carol Stream, Illinois 60188. All rights reserved."
+    ),
     MSG("MSG", false),
     NASB("NASB", false),
     AMP("AMP", false),
