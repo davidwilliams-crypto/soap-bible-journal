@@ -13,9 +13,12 @@ android {
         applicationId = "com.soapjournal.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"davidwilliams-crypto\"")
+        buildConfigField("String", "UPDATE_GITHUB_REPO", "\"soap-bible-journal\"")
     }
 
     buildTypes {
@@ -39,6 +42,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     packaging {

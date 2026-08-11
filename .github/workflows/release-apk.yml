@@ -1,0 +1,63 @@
+name: Build and attach release APK
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+      - name: Prepare APK artifact
+        id: apk
+        run: |
+          VERSION_NAME=$(grep versionName app/build.gradle.kts | head -1 | sed -E 's/.*"([^"]+)".*/\1/')
+          VERSION_CODE=$(grep versionCode app/build.gradle.kts | head -1 | sed -E 's/[^0-9]//g')
+          SRC=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          NAME="SOAPBibleJournal-v${VERSION_CODE}-${VERSION_NAME}.apk"
+          mkdir -p dist
+          cp "$SRC" "dist/$NAME"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
+          echo "path=dist/$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: soap-bible-journal-apk
+          path: ${{ steps.apk.outputs.path }}
+
+      - name: Attach APK to published GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.apk.outputs.path }}
+          body: |
+            versionCode=${{ steps.apk.outputs.version_code }}
+
+            SOAP Journal ${{ steps.apk.outputs.version_name }}
+          append_body: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

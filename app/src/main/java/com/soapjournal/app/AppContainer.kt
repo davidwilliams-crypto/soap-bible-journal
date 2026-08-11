@@ -7,6 +7,7 @@ import com.soapjournal.app.data.bible.BibleRepository
 import com.soapjournal.app.data.ink.InkStore
 import com.soapjournal.app.data.prefs.UserPreferencesRepository
 import com.soapjournal.app.notifications.ReminderScheduler
+import com.soapjournal.app.update.AppUpdateManager
 
 class AppContainer(context: Context) {
     private val appContext = context.applicationContext
@@ -21,4 +22,5 @@ class AppContainer(context: Context) {
         prefs = prefs
     )
     val reminders = ReminderScheduler(appContext)
+    val updates = AppUpdateManager(appContext)
 }
