@@ -3,13 +3,17 @@ package com.soapjournal.app.ui.editor
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.CreationExtras
 import com.soapjournal.app.data.JournalRepository
 import com.soapjournal.app.data.SoapEntryEntity
 import com.soapjournal.app.data.SoapSection
 import com.soapjournal.app.data.ink.InkDocument
+import com.soapjournal.app.ui.ink.InkDefaults
 import com.soapjournal.app.ui.ink.InkTool
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -24,7 +28,8 @@ data class SectionInkState(
 
 class EntryEditorViewModel(
     private val repository: JournalRepository,
-    private val entryId: Long
+    private val entryId: Long,
+    private val savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
     var entry by mutableStateOf<SoapEntryEntity?>(null)
@@ -35,11 +40,15 @@ class EntryEditorViewModel(
         private set
     var tags by mutableStateOf("")
         private set
-    var selectedSection by mutableStateOf(SoapSection.SCRIPTURE)
+    var selectedSection by mutableStateOf(
+        SoapSection.fromKey(
+            savedStateHandle.get<String>(KEY_SECTION) ?: SoapSection.SCRIPTURE.key
+        )
+    )
         private set
     var tool by mutableStateOf(InkTool.PEN)
         private set
-    var strokeWidth by mutableStateOf(4f)
+    var strokeWidth by mutableStateOf(InkDefaults.DefaultStrokeWidth)
         private set
     var sectionInk by mutableStateOf(
         SoapSection.entries.associateWith { SectionInkState() }
@@ -52,6 +61,10 @@ class EntryEditorViewModel(
     var applicationFollowThrough by mutableStateOf(false)
         private set
     var prayerFollowThrough by mutableStateOf(false)
+        private set
+    var focusWriting by mutableStateOf(
+        savedStateHandle.get<Boolean>(KEY_FOCUS) ?: false
+    )
         private set
 
     private var metadataPersistJob: Job? = null
@@ -80,6 +93,7 @@ class EntryEditorViewModel(
 
     fun selectSection(section: SoapSection) {
         selectedSection = section
+        savedStateHandle[KEY_SECTION] = section.key
     }
 
     fun chooseTool(value: InkTool) {
@@ -88,6 +102,11 @@ class EntryEditorViewModel(
 
     fun changeStrokeWidth(value: Float) {
         strokeWidth = value
+    }
+
+    fun toggleFocusWriting() {
+        focusWriting = !focusWriting
+        savedStateHandle[KEY_FOCUS] = focusWriting
     }
 
     fun updateReference(value: String) {
@@ -116,6 +135,15 @@ class EntryEditorViewModel(
             redoStack = emptyList()
         ))
         scheduleInkSave(section)
+    }
+
+    fun extendCanvas(section: SoapSection) {
+        val current = sectionInk[section] ?: SectionInkState()
+        val taller = current.document.copy(
+            canvasHeight = current.document.canvasHeight + InkDefaults.PageExtendPx
+        )
+        onInkChanged(section, taller)
+        statusMessage = "Added writing space"
     }
 
     fun undo(section: SoapSection) {
@@ -167,6 +195,15 @@ class EntryEditorViewModel(
         }
     }
 
+    /** Flush pending edits when the app goes to background. */
+    fun flushForBackground() {
+        metadataPersistJob?.cancel()
+        inkPersistJob?.cancel()
+        runBlocking {
+            flushPending(markSaved = false)
+        }
+    }
+
     fun consumeStatus() {
         statusMessage = null
     }
@@ -201,7 +238,6 @@ class EntryEditorViewModel(
     override fun onCleared() {
         metadataPersistJob?.cancel()
         inkPersistJob?.cancel()
-        // Flush pending edits so leaving within the debounce window does not drop work.
         runBlocking {
             val inkHasContent = dirtyInkSections.any { section ->
                 sectionInk[section]?.document?.strokes?.isNotEmpty() == true
@@ -239,7 +275,6 @@ class EntryEditorViewModel(
             repository.saveInk(entryId, section, doc)
         }
         if (sections.isNotEmpty() || metadataDirty) {
-            // Clearing a canvas must not mark the day complete.
             persistMetadata(markSaved = anyContent)
             metadataDirty = false
             entry = repository.getEntry(entryId)
@@ -271,11 +306,25 @@ class EntryEditorViewModel(
 
     class Factory(
         private val repository: JournalRepository,
-        private val entryId: Long
+        private val entryId: Long,
+        private val initialSectionKey: String? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return EntryEditorViewModel(repository, entryId) as T
+        override fun <T : ViewModel> create(modelClass: Class<T>, extras: CreationExtras): T {
+            val handle = extras.createSavedStateHandle()
+            if (!handle.contains(KEY_SECTION) && !initialSectionKey.isNullOrBlank()) {
+                handle[KEY_SECTION] = initialSectionKey
+            }
+            return EntryEditorViewModel(
+                repository = repository,
+                entryId = entryId,
+                savedStateHandle = handle
+            ) as T
         }
+    }
+
+    companion object {
+        const val KEY_SECTION = "soap_section"
+        private const val KEY_FOCUS = "focus_writing"
     }
 }

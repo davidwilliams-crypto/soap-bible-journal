@@ -13,8 +13,8 @@ android {
         applicationId = "com.soapjournal.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "1.4.0"
+        versionCode = 9
+        versionName = "1.4.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"davidwilliams-crypto\"")

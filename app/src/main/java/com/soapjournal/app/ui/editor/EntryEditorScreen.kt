@@ -22,7 +22,10 @@ import androidx.compose.material.icons.automirrored.outlined.Redo
 import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.Fullscreen
+import androidx.compose.material.icons.outlined.FullscreenExit
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.PostAdd
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Share
@@ -43,6 +46,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +57,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.soapjournal.app.data.SoapSection
 import com.soapjournal.app.ui.components.ConfirmActionDialog
 import com.soapjournal.app.ui.export.PdfExporter
@@ -76,6 +83,28 @@ fun EntryEditorScreen(
         pageCount = { sections.size }
     )
     val surfaces = LocalJournalSurfaces.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    val focus = viewModel.focusWriting
+
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                viewModel.flushForBackground()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            viewModel.flushForBackground()
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    LaunchedEffect(viewModel.selectedSection) {
+        val index = sections.indexOf(viewModel.selectedSection).coerceAtLeast(0)
+        if (pagerState.currentPage != index) {
+            pagerState.scrollToPage(index)
+        }
+    }
 
     LaunchedEffect(pagerState.currentPage) {
         viewModel.selectSection(sections[pagerState.currentPage])
@@ -99,14 +128,16 @@ fun EntryEditorScreen(
                 title = {
                     Column {
                         Text(
-                            "SOAP",
+                            if (focus) viewModel.selectedSection.title else "SOAP",
                             style = MaterialTheme.typography.titleLarge
                         )
-                        Text(
-                            text = viewModel.scriptureReference.ifBlank { "Add scripture" },
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        if (!focus) {
+                            Text(
+                                text = viewModel.scriptureReference.ifBlank { "Add scripture" },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 },
                 navigationIcon = {
@@ -115,58 +146,66 @@ fun EntryEditorScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { viewModel.addScriptureToMemory() }) {
-                        Icon(Icons.Outlined.Psychology, contentDescription = "Memorize")
+                    IconButton(onClick = { viewModel.toggleFocusWriting() }) {
+                        Icon(
+                            if (focus) Icons.Outlined.FullscreenExit else Icons.Outlined.Fullscreen,
+                            contentDescription = if (focus) "Show tools" else "Focus writing"
+                        )
                     }
-                    IconButton(onClick = {
-                        viewModel.entry?.let {
-                            AccountabilityShare.shareReflection(
-                                context,
-                                it.copy(
-                                    scriptureReference = viewModel.scriptureReference,
-                                    scriptureText = viewModel.scriptureText,
-                                    tags = viewModel.tags,
-                                    applicationFollowThrough = viewModel.applicationFollowThrough,
-                                    prayerFollowThrough = viewModel.prayerFollowThrough
-                                )
-                            )
+                    if (!focus) {
+                        IconButton(onClick = { viewModel.addScriptureToMemory() }) {
+                            Icon(Icons.Outlined.Psychology, contentDescription = "Memorize")
                         }
-                    }) {
-                        Icon(Icons.Outlined.Groups, contentDescription = "Share with partners")
-                    }
-                    IconButton(onClick = { viewModel.saveNow() }) {
-                        Icon(Icons.Outlined.Save, contentDescription = "Save")
-                    }
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                val entry = viewModel.entry ?: return@launch
-                                val ink = SoapSection.entries.associateWith { section ->
-                                    viewModel.sectionInk[section]?.document
-                                        ?: com.soapjournal.app.data.ink.InkDocument()
-                                }
-                                viewModel.saveNow()
-                                val uri = PdfExporter.exportEntry(
+                        IconButton(onClick = {
+                            viewModel.entry?.let {
+                                AccountabilityShare.shareReflection(
                                     context,
-                                    entry.copy(
+                                    it.copy(
                                         scriptureReference = viewModel.scriptureReference,
                                         scriptureText = viewModel.scriptureText,
-                                        tags = viewModel.tags
-                                    ),
-                                    ink
-                                )
-                                val share = Intent(Intent.ACTION_SEND).apply {
-                                    type = "application/pdf"
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                }
-                                context.startActivity(
-                                    Intent.createChooser(share, "Export SOAP entry")
+                                        tags = viewModel.tags,
+                                        applicationFollowThrough = viewModel.applicationFollowThrough,
+                                        prayerFollowThrough = viewModel.prayerFollowThrough
+                                    )
                                 )
                             }
+                        }) {
+                            Icon(Icons.Outlined.Groups, contentDescription = "Share with partners")
                         }
-                    ) {
-                        Icon(Icons.Outlined.Share, contentDescription = "Export PDF")
+                        IconButton(onClick = { viewModel.saveNow() }) {
+                            Icon(Icons.Outlined.Save, contentDescription = "Save")
+                        }
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    val entry = viewModel.entry ?: return@launch
+                                    val ink = SoapSection.entries.associateWith { section ->
+                                        viewModel.sectionInk[section]?.document
+                                            ?: com.soapjournal.app.data.ink.InkDocument()
+                                    }
+                                    viewModel.saveNow()
+                                    val uri = PdfExporter.exportEntry(
+                                        context,
+                                        entry.copy(
+                                            scriptureReference = viewModel.scriptureReference,
+                                            scriptureText = viewModel.scriptureText,
+                                            tags = viewModel.tags
+                                        ),
+                                        ink
+                                    )
+                                    val share = Intent(Intent.ACTION_SEND).apply {
+                                        type = "application/pdf"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(
+                                        Intent.createChooser(share, "Export SOAP entry")
+                                    )
+                                }
+                            }
+                        ) {
+                            Icon(Icons.Outlined.Share, contentDescription = "Export PDF")
+                        }
                     }
                 }
             )
@@ -191,25 +230,27 @@ fun EntryEditorScreen(
                 .padding(padding)
                 .imePadding()
         ) {
-            ScrollableTabRow(
-                selectedTabIndex = pagerState.currentPage,
-                edgePadding = 12.dp,
-                containerColor = surfaces.paper,
-                divider = {}
-            ) {
-                sections.forEachIndexed { index, section ->
-                    Tab(
-                        selected = pagerState.currentPage == index,
-                        onClick = {
-                            scope.launch { pagerState.animateScrollToPage(index) }
-                        },
-                        text = {
-                            Text(
-                                section.title,
-                                style = MaterialTheme.typography.labelLarge
-                            )
-                        }
-                    )
+            if (!focus) {
+                ScrollableTabRow(
+                    selectedTabIndex = pagerState.currentPage,
+                    edgePadding = 12.dp,
+                    containerColor = surfaces.paper,
+                    divider = {}
+                ) {
+                    sections.forEachIndexed { index, section ->
+                        Tab(
+                            selected = pagerState.currentPage == index,
+                            onClick = {
+                                scope.launch { pagerState.animateScrollToPage(index) }
+                            },
+                            text = {
+                                Text(
+                                    section.title,
+                                    style = MaterialTheme.typography.labelLarge
+                                )
+                            }
+                        )
+                    }
                 }
             }
 
@@ -218,7 +259,6 @@ fun EntryEditorScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                // Never let pager swipe steal stylus strokes on O/A/P writing pages.
                 userScrollEnabled = false
             ) { page ->
                 val section = sections[page]
@@ -226,7 +266,8 @@ fun EntryEditorScreen(
                     SoapSection.SCRIPTURE -> ScripturePane(viewModel)
                     else -> InkPane(
                         section = section,
-                        viewModel = viewModel
+                        viewModel = viewModel,
+                        focusWriting = focus
                     )
                 }
             }
@@ -287,7 +328,8 @@ private fun ScripturePane(viewModel: EntryEditorViewModel) {
 @Composable
 private fun InkPane(
     section: SoapSection,
-    viewModel: EntryEditorViewModel
+    viewModel: EntryEditorViewModel,
+    focusWriting: Boolean
 ) {
     val state = viewModel.sectionInk[section] ?: SectionInkState()
     var confirmClear by remember { mutableStateOf(false) }
@@ -306,18 +348,20 @@ private fun InkPane(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(section.title, style = MaterialTheme.typography.headlineSmall)
-            Text(
-                section.prompt,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        if (!focusWriting) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(section.title, style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    section.prompt,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
 
         Row(
@@ -339,6 +383,9 @@ private fun InkPane(
                 label = { Text("Eraser") }
             )
             Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = { viewModel.extendCanvas(section) }) {
+                Icon(Icons.Outlined.PostAdd, contentDescription = "Add writing space")
+            }
             IconButton(
                 onClick = { viewModel.undo(section) },
                 enabled = state.undoStack.isNotEmpty()
@@ -351,56 +398,67 @@ private fun InkPane(
             ) {
                 Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = "Redo")
             }
-            IconButton(onClick = { confirmClear = true }) {
-                Icon(Icons.Outlined.Clear, contentDescription = "Clear page")
+            if (!focusWriting) {
+                IconButton(onClick = { confirmClear = true }) {
+                    Icon(Icons.Outlined.Clear, contentDescription = "Clear page")
+                }
             }
         }
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Stroke", style = MaterialTheme.typography.labelMedium)
-            Spacer(modifier = Modifier.width(12.dp))
-            Slider(
-                value = viewModel.strokeWidth,
-                onValueChange = viewModel::changeStrokeWidth,
-                valueRange = 2f..14f,
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        if (section == SoapSection.APPLICATION || section == SoapSection.PRAYER) {
+        if (!focusWriting) {
             Row(
-                modifier = Modifier.padding(horizontal = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                val checked = if (section == SoapSection.APPLICATION) {
-                    viewModel.applicationFollowThrough
-                } else {
-                    viewModel.prayerFollowThrough
-                }
-                Checkbox(
-                    checked = checked,
-                    onCheckedChange = { done ->
-                        if (section == SoapSection.APPLICATION) {
-                            viewModel.markApplicationFollowThrough(done)
-                        } else {
-                            viewModel.markPrayerFollowThrough(done)
-                        }
-                    }
-                )
-                Text(
-                    if (section == SoapSection.APPLICATION) {
-                        "I will follow through on this application"
-                    } else {
-                        "I prayed this through"
-                    },
-                    style = MaterialTheme.typography.bodyMedium
+                Text("Stroke", style = MaterialTheme.typography.labelMedium)
+                Spacer(modifier = Modifier.width(12.dp))
+                Slider(
+                    value = viewModel.strokeWidth,
+                    onValueChange = viewModel::changeStrokeWidth,
+                    valueRange = 2f..14f,
+                    modifier = Modifier.weight(1f)
                 )
             }
+
+            if (section == SoapSection.APPLICATION || section == SoapSection.PRAYER) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val checked = if (section == SoapSection.APPLICATION) {
+                        viewModel.applicationFollowThrough
+                    } else {
+                        viewModel.prayerFollowThrough
+                    }
+                    Checkbox(
+                        checked = checked,
+                        onCheckedChange = { done ->
+                            if (section == SoapSection.APPLICATION) {
+                                viewModel.markApplicationFollowThrough(done)
+                            } else {
+                                viewModel.markPrayerFollowThrough(done)
+                            }
+                        }
+                    )
+                    Text(
+                        if (section == SoapSection.APPLICATION) {
+                            "I will follow through on this application"
+                        } else {
+                            "I prayed this through"
+                        },
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        }
+
+        TextButton(
+            onClick = { viewModel.extendCanvas(section) },
+            modifier = Modifier.padding(horizontal = 12.dp)
+        ) {
+            Text("Add writing space")
         }
 
         Spacer(modifier = Modifier.height(2.dp))

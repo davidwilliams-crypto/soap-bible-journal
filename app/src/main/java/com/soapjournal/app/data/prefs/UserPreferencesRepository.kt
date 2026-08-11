@@ -29,7 +29,11 @@ data class UserPreferences(
     val lastCompletedEpochDay: Long = -1L,
     val githubUpdateToken: String = "",
     val backupFolderUri: String = "",
-    val lastBackupEpochMs: Long = 0L
+    val lastBackupEpochMs: Long = 0L,
+    /** Last screen route for resume-after-app-switch (e.g. home, editor, bible). */
+    val resumeRoute: String = "home",
+    val resumeEntryId: Long = -1L,
+    val resumeSection: String = ""
 )
 
 /** Preferences included in journal backups (never includes secrets). */
@@ -63,6 +67,9 @@ class UserPreferencesRepository(private val context: Context) {
         val githubUpdateToken = stringPreferencesKey("github_update_token")
         val backupFolderUri = stringPreferencesKey("backup_folder_uri")
         val lastBackupEpochMs = longPreferencesKey("last_backup_epoch_ms")
+        val resumeRoute = stringPreferencesKey("resume_route")
+        val resumeEntryId = longPreferencesKey("resume_entry_id")
+        val resumeSection = stringPreferencesKey("resume_section")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
@@ -82,7 +89,10 @@ class UserPreferencesRepository(private val context: Context) {
             lastCompletedEpochDay = prefs[Keys.lastCompleted] ?: -1L,
             githubUpdateToken = prefs[Keys.githubUpdateToken].orEmpty(),
             backupFolderUri = prefs[Keys.backupFolderUri].orEmpty(),
-            lastBackupEpochMs = prefs[Keys.lastBackupEpochMs] ?: 0L
+            lastBackupEpochMs = prefs[Keys.lastBackupEpochMs] ?: 0L,
+            resumeRoute = prefs[Keys.resumeRoute] ?: "home",
+            resumeEntryId = prefs[Keys.resumeEntryId] ?: -1L,
+            resumeSection = prefs[Keys.resumeSection].orEmpty()
         )
     }
 
@@ -186,6 +196,26 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setLastBackupEpochMs(epochMs: Long) {
         context.dataStore.edit { it[Keys.lastBackupEpochMs] = epochMs }
+    }
+
+    suspend fun setResumeSession(
+        route: String,
+        entryId: Long = -1L,
+        section: String = ""
+    ) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.resumeRoute] = route
+            if (entryId > 0L) {
+                prefs[Keys.resumeEntryId] = entryId
+            } else {
+                prefs.remove(Keys.resumeEntryId)
+            }
+            if (section.isNotBlank()) {
+                prefs[Keys.resumeSection] = section
+            } else {
+                prefs.remove(Keys.resumeSection)
+            }
+        }
     }
 
     suspend fun recordDailyCompletion(date: LocalDate = LocalDate.now()) {

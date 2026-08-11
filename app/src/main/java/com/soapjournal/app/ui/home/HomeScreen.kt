@@ -47,7 +47,8 @@ fun HomeScreen(
     onOpenBible: () -> Unit,
     onOpenPlan: () -> Unit,
     onOpenMemory: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    resumeEntryId: Long? = null
 ) {
     val entries by viewModel.entries.collectAsStateWithLifecycle()
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
@@ -130,6 +131,12 @@ fun HomeScreen(
                             if (todayEntry != null) "Continue today’s SOAP" else "Begin today’s SOAP",
                             style = MaterialTheme.typography.labelLarge
                         )
+                    }
+                    if (resumeEntryId != null && resumeEntryId != todayEntry?.id) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(onClick = { onOpenEntry(resumeEntryId) }) {
+                            Text("Pick up where you left off")
+                        }
                     }
                     if (todayEntry != null) {
                         Spacer(modifier = Modifier.height(8.dp))
