@@ -72,6 +72,7 @@ fun HistoryScreen(
             )
 
             if (entries.isEmpty()) {
+                val searching = viewModel.query.isNotBlank()
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
@@ -79,9 +80,16 @@ fun HistoryScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("No journal entries yet", style = MaterialTheme.typography.titleLarge)
                     Text(
-                        "Start a SOAP entry to begin journaling.",
+                        if (searching) "No matching entries" else "No journal entries yet",
+                        style = MaterialTheme.typography.titleLarge
+                    )
+                    Text(
+                        if (searching) {
+                            "Try a different reference or tag."
+                        } else {
+                            "Start a SOAP entry to begin journaling."
+                        },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

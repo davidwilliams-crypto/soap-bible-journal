@@ -4,7 +4,7 @@ import java.time.LocalDate
 
 class BibleRepository {
     private val byBookChapter: Map<Pair<String, Int>, List<BibleVerse>> =
-        KjvCorpus.verses.groupBy { it.book to it.chapter }
+        KjvCorpus.verses.groupBy { it.book.lowercase() to it.chapter }
             .mapValues { (_, list) -> list.sortedBy { it.verse } }
 
     private val byReference: Map<String, BibleVerse> =
@@ -19,7 +19,7 @@ class BibleRepository {
             .sorted()
 
     fun chapter(book: String, chapter: Int, version: BibleVersion): List<BibleVerse> {
-        val kjv = byBookChapter[book to chapter].orEmpty()
+        val kjv = byBookChapter[book.lowercase() to chapter].orEmpty()
         return if (version == BibleVersion.KJV || !version.offlineAvailable) {
             // Licensed versions fall back to offline KJV until a licensed feed is wired.
             kjv
@@ -29,6 +29,11 @@ class BibleRepository {
     }
 
     fun lookup(reference: String): BibleVerse? = byReference[normalizeRef(reference)]
+
+    fun passageText(refs: List<PassageRef>, version: BibleVersion): String =
+        refs.map { passageText(it, version) }
+            .filter { it.isNotBlank() }
+            .joinToString("\n\n")
 
     fun passageText(ref: PassageRef, version: BibleVersion): String {
         val chapters = (ref.startChapter..ref.endChapter).flatMap { chapter(ref.book, it, version) }
@@ -54,6 +59,7 @@ class BibleRepository {
 
     private fun normalizeRef(ref: String): String =
         ref.trim()
+            .lowercase()
             .replace('–', '-')
             .replace("—", "-")
             .replace(Regex("\\s+"), " ")

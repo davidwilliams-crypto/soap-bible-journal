@@ -23,4 +23,30 @@ class BibleRepositoryTest {
         assertTrue(verse != null)
         assertTrue(verse!!.text.contains("God so loved the world"))
     }
+
+    @Test
+    fun lookupIsCaseInsensitive() {
+        val verse = repo.lookup("john 3:16")
+        assertTrue(verse != null)
+        assertEquals("John 3:16", verse!!.reference)
+    }
+
+    @Test
+    fun chapterLookupIsCaseInsensitive() {
+        val verses = repo.chapter("john", 3, BibleVersion.KJV)
+        assertTrue(verses.any { it.verse == 16 })
+    }
+
+    @Test
+    fun passageTextJoinsMultipleRefs() {
+        val text = repo.passageText(
+            listOf(
+                PassageRef("John", 3, 3, startVerse = 16, endVerse = 16),
+                PassageRef("Psalm", 23, 23, startVerse = 1, endVerse = 1)
+            ),
+            BibleVersion.KJV
+        )
+        assertTrue(text.contains("God so loved the world"))
+        assertTrue(text.contains("my shepherd"))
+    }
 }

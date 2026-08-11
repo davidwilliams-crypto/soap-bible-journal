@@ -59,6 +59,18 @@ class UserPreferencesRepository(private val context: Context) {
         )
     }
 
+    /**
+     * Persist the plan start on first launch so day progress does not reset to "Day 1"
+     * every time preferences are read without a stored value.
+     */
+    suspend fun ensurePlanStartInitialized(date: LocalDate = LocalDate.now()) {
+        context.dataStore.edit { prefs ->
+            if (prefs[Keys.planStart] == null) {
+                prefs[Keys.planStart] = date.toEpochDay()
+            }
+        }
+    }
+
     suspend fun setDarkTheme(enabled: Boolean) {
         context.dataStore.edit { it[Keys.darkTheme] = enabled }
     }
@@ -92,19 +104,21 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun recordDailyCompletion(date: LocalDate = LocalDate.now()) {
         context.dataStore.edit { prefs ->
-            val today = date.toEpochDay()
+            val day = date.toEpochDay()
             val last = prefs[Keys.lastCompleted] ?: -1L
-            if (last == today) return@edit
+            if (last == day) return@edit
+            // Never move lastCompleted backward (e.g. saving an older entry).
+            if (day < last) return@edit
 
             val current = prefs[Keys.currentStreak] ?: 0
             val longest = prefs[Keys.longestStreak] ?: 0
             val next = when {
-                last == today - 1L -> current + 1
+                last == day - 1L -> current + 1
                 else -> 1
             }
             prefs[Keys.currentStreak] = next
             prefs[Keys.longestStreak] = maxOf(longest, next)
-            prefs[Keys.lastCompleted] = today
+            prefs[Keys.lastCompleted] = day
         }
     }
 }

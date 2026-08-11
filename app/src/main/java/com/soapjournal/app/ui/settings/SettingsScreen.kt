@@ -102,7 +102,8 @@ fun SettingsScreen(
                                 }
                                 container.reminders.scheduleDaily(prefs.reminderHour, prefs.reminderMinute)
                             } else {
-                                container.reminders.cancelAll()
+                                // Only cancel the daily reminder; leave follow-through alone.
+                                container.reminders.cancelDaily()
                             }
                         }
                     }
@@ -140,7 +141,12 @@ fun SettingsScreen(
                         scope.launch {
                             container.prefs.setFollowThroughEnabled(enabled)
                             if (enabled) {
+                                if (Build.VERSION.SDK_INT >= 33) {
+                                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
                                 container.reminders.scheduleFollowThrough(prefs.followThroughHour)
+                            } else {
+                                container.reminders.cancelFollowThrough()
                             }
                         }
                     }
