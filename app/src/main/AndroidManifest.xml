@@ -35,5 +35,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <receiver
+            android:name=".update.UpdateInstallReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.soapjournal.app.UPDATE_INSTALL_COMPLETE" />
+            </intent-filter>
+        </receiver>
     </application>
 </manifest>

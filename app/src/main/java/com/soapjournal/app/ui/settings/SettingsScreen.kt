@@ -47,6 +47,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.soapjournal.app.AppContainer
 import com.soapjournal.app.backup.BackupResult
 import com.soapjournal.app.update.AvailableUpdate
+import com.soapjournal.app.update.InstallPrepResult
 import com.soapjournal.app.update.UpdateCheckResult
 import com.soapjournal.app.ui.components.ConfirmActionDialog
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
@@ -78,6 +79,7 @@ fun SettingsScreen(
     var backupStatus by remember { mutableStateOf<String?>(null) }
     var confirmRestoreFromFolder by remember { mutableStateOf(false) }
     var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
+    var signatureMismatchUpdate by remember { mutableStateOf<AvailableUpdate?>(null) }
 
     val chooseDriveFolder = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -136,6 +138,28 @@ fun SettingsScreen(
                 }
             },
             onDismiss = { pendingRestoreUri = null }
+        )
+    }
+
+    signatureMismatchUpdate?.let { update ->
+        ConfirmActionDialog(
+            title = "One-time reinstall required",
+            body = "Android won’t overwrite this install because the signing key changed.\n\n" +
+                "1. Back up to Google Drive first\n" +
+                "2. Uninstall SOAP Journal\n" +
+                "3. Install ${update.versionName} from the release page\n" +
+                "4. Restore from Drive\n\n" +
+                "After that, Check for updates will work normally.",
+            confirmLabel = "Open download page",
+            destructive = false,
+            onConfirm = {
+                val url = update.apkUrl.ifBlank {
+                    update.htmlUrl.ifBlank { container.updates.latestReleasePageUrl() }
+                }
+                container.updates.openInBrowser(url)
+                signatureMismatchUpdate = null
+            },
+            onDismiss = { signatureMismatchUpdate = null }
         )
     }
 
@@ -362,7 +386,7 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
-                    "Checks public GitHub Releases for a newer APK, then opens the system installer. If Android says the app is not installed, back up to Drive, uninstall the old build once, then install this update — older sideloads used mismatched signing keys.",
+                    "Checks GitHub Releases and opens the system installer. If the signing key changed (common on older sideloads), Android blocks in-place updates — back up to Drive, uninstall once, install the APK from the release page, then restore.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -394,6 +418,13 @@ fun SettingsScreen(
                 ) {
                     Text(if (checking) "Checking…" else "Check for updates")
                 }
+                TextButton(
+                    onClick = {
+                        container.updates.openInBrowser(container.updates.latestReleasePageUrl())
+                    }
+                ) {
+                    Text("Open latest release page")
+                }
 
                 availableUpdate?.let { update ->
                     Button(
@@ -411,8 +442,8 @@ fun SettingsScreen(
                                 downloading = true
                                 downloadProgress = 0f
                                 updateStatus = "Downloading ${update.versionName}…"
-                                runCatching {
-                                    val file = container.updates.downloadApk(update) {
+                                when (
+                                    val prep = container.updates.prepareInstall(update) {
                                         downloaded,
                                         total ->
                                         downloadProgress = if (total > 0) {
@@ -421,10 +452,22 @@ fun SettingsScreen(
                                             0f
                                         }
                                     }
-                                    updateStatus = "Opening installer…"
-                                    container.updates.installApk(file)
-                                }.onFailure {
-                                    updateStatus = it.message ?: "Download failed"
+                                ) {
+                                    is InstallPrepResult.Ready -> {
+                                        updateStatus = "Opening installer…"
+                                        runCatching {
+                                            container.updates.installApk(prep.file)
+                                        }.onFailure {
+                                            updateStatus = it.message ?: "Install failed"
+                                        }
+                                    }
+                                    is InstallPrepResult.SignatureMismatch -> {
+                                        updateStatus = prep.message
+                                        signatureMismatchUpdate = prep.update
+                                    }
+                                    is InstallPrepResult.Error -> {
+                                        updateStatus = prep.message
+                                    }
                                 }
                                 downloading = false
                             }
@@ -443,9 +486,7 @@ fun SettingsScreen(
                     if (update.htmlUrl.isNotBlank()) {
                         TextButton(
                             onClick = {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(update.htmlUrl))
-                                )
+                                container.updates.openInBrowser(update.htmlUrl)
                             }
                         ) {
                             Text("View release notes")

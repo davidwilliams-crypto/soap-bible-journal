@@ -135,6 +135,7 @@ fun ConfirmActionDialog(
     title: String,
     body: String,
     confirmLabel: String = "Confirm",
+    destructive: Boolean = true,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -150,7 +151,14 @@ fun ConfirmActionDialog(
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
-                Text(confirmLabel, color = MaterialTheme.colorScheme.error)
+                Text(
+                    confirmLabel,
+                    color = if (destructive) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    }
+                )
             }
         },
         dismissButton = {
