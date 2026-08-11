@@ -362,7 +362,7 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
-                    "Checks public GitHub Releases for a newer APK, then opens the system installer.",
+                    "Checks public GitHub Releases for a newer APK, then opens the system installer. If Android says the app is not installed, back up to Drive, uninstall the old build once, then install this update — older sideloads used mismatched signing keys.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

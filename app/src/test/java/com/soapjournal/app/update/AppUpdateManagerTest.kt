@@ -17,10 +17,22 @@ class AppUpdateManagerTest {
     }
 
     @Test
-    fun parsesVersionCodeFromAssetName() {
+    fun parsesVersionCodeFromDistributeAssetName() {
+        assertEquals(
+            10L,
+            AppUpdateManager.parseVersionCode(
+                null,
+                "SOAPBibleJournal-v10-1.4.2.apk",
+                "v1.4.2"
+            )
+        )
+    }
+
+    @Test
+    fun parsesVersionCodeFromVersionCodeAssetName() {
         assertEquals(
             3L,
-            AppUpdateManager.parseVersionCode(null, "soap-journal-v3.apk", "v1.2.0")
+            AppUpdateManager.parseVersionCode(null, "soap-journal-versionCode-3.apk", "v1.2.0")
         )
     }
 

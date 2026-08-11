@@ -13,17 +13,33 @@ android {
         applicationId = "com.soapjournal.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 9
-        versionName = "1.4.1"
+        versionCode = 10
+        versionName = "1.4.2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         buildConfigField("String", "UPDATE_GITHUB_OWNER", "\"davidwilliams-crypto\"")
         buildConfigField("String", "UPDATE_GITHUB_REPO", "\"soap-bible-journal\"")
     }
 
+    // Stable sideload signing so in-app updates are not rejected as incompatible.
+    // (GitHub Actions debug keystores are ephemeral and break upgrades.)
+    signingConfigs {
+        create("distribute") {
+            val store = rootProject.file("app/keystore/soap-distribute.jks")
+            storeFile = store
+            storePassword = "soap-journal-distribute"
+            keyAlias = "soapjournal"
+            keyPassword = "soap-journal-distribute"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("distribute")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("distribute")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
