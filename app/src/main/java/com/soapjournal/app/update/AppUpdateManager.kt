@@ -1,7 +1,9 @@
 package com.soapjournal.app.update
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -15,6 +17,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.security.MessageDigest
 
 data class AvailableUpdate(
     val versionName: String,
@@ -31,15 +34,22 @@ sealed class UpdateCheckResult {
     data class Error(val message: String) : UpdateCheckResult()
 }
 
+sealed class InstallPrepResult {
+    data class Ready(val file: File) : InstallPrepResult()
+    data class SignatureMismatch(
+        val file: File,
+        val update: AvailableUpdate,
+        val message: String
+    ) : InstallPrepResult()
+    data class Error(val message: String) : InstallPrepResult()
+}
+
 /**
  * Checks GitHub Releases for a newer APK and installs it via the system package installer.
  *
- * Because this repository is private, pass a GitHub token with `contents: read`
- * (fine-grained PAT or classic token) so the phone can see releases.
- *
  * Publish flow:
  * 1. Bump versionCode / versionName in app/build.gradle.kts
- * 2. Build an APK and create a GitHub Release tagged like v1.2.0
+ * 2. Build a distribute-signed APK and create a GitHub Release tagged like v1.2.0
  * 3. Put `versionCode=N` in the release body
  * 4. Attach the `.apk` as a release asset
  */
@@ -79,6 +89,9 @@ class AppUpdateManager(
         }
     }.getOrDefault(BuildConfig.VERSION_CODE.toLong())
 
+    fun latestReleasePageUrl(): String =
+        "https://github.com/$owner/$repo/releases/latest"
+
     suspend fun checkForUpdate(): UpdateCheckResult = withContext(Dispatchers.IO) {
         try {
             val token = tokenProvider().trim()
@@ -88,16 +101,12 @@ class AppUpdateManager(
                 when (connection.responseCode) {
                     401, 403 -> {
                         return@withContext UpdateCheckResult.Error(
-                            "GitHub auth failed. Add a read-only GitHub token in Settings (repo is private)."
+                            "GitHub auth failed. Add a read-only GitHub token in Settings."
                         )
                     }
                     404 -> {
                         return@withContext UpdateCheckResult.Error(
-                            if (token.isBlank()) {
-                                "No public release found. This repo is private — paste a GitHub token in Settings, or make the repo public."
-                            } else {
-                                "No GitHub release found (404). Publish a release with an APK attached."
-                            }
+                            "No GitHub release found (404)."
                         )
                     }
                     !in 200..299 -> {
@@ -136,7 +145,7 @@ class AppUpdateManager(
                         apkUrl = apk.browserDownloadUrl.orEmpty(),
                         apkAssetApiUrl = apk.url,
                         releaseNotes = release.body.orEmpty().trim(),
-                        htmlUrl = release.htmlUrl.orEmpty()
+                        htmlUrl = release.htmlUrl.orEmpty().ifBlank { latestReleasePageUrl() }
                     )
                 )
             } finally {
@@ -156,7 +165,6 @@ class AppUpdateManager(
         dir.listFiles()?.forEach { it.delete() }
         val outFile = File(dir, "soap-journal-update-${update.versionCode}.apk")
 
-        // Private repos must download via the releases asset API URL with auth.
         val downloadUrl = when {
             token.isNotBlank() && !update.apkAssetApiUrl.isNullOrBlank() -> update.apkAssetApiUrl
             update.apkUrl.isNotBlank() -> update.apkUrl
@@ -170,7 +178,7 @@ class AppUpdateManager(
             accept = "application/octet-stream"
         ).apply {
             instanceFollowRedirects = true
-            readTimeout = 60_000
+            readTimeout = 120_000
         }
         try {
             if (connection.responseCode !in 200..299) {
@@ -191,9 +199,33 @@ class AppUpdateManager(
                     output.flush()
                 }
             }
+            if (outFile.length() < 1_000_000L) {
+                error("Downloaded file looks too small to be an APK (${outFile.length()} bytes).")
+            }
             outFile
         } finally {
             connection.disconnect()
+        }
+    }
+
+    suspend fun prepareInstall(
+        update: AvailableUpdate,
+        onProgress: (downloaded: Long, total: Long) -> Unit = { _, _ -> }
+    ): InstallPrepResult = withContext(Dispatchers.IO) {
+        runCatching {
+            val file = downloadApk(update, onProgress)
+            if (!signaturesCompatible(file)) {
+                InstallPrepResult.SignatureMismatch(
+                    file = file,
+                    update = update,
+                    message = "Android can’t upgrade this install because the signing key changed. " +
+                        "Back up to Google Drive, uninstall SOAP Journal, then install the APK from the release page."
+                )
+            } else {
+                InstallPrepResult.Ready(file)
+            }
+        }.getOrElse {
+            InstallPrepResult.Error(it.message ?: "Download failed")
         }
     }
 
@@ -210,7 +242,46 @@ class AppUpdateManager(
             Uri.parse("package:${context.packageName}")
         ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
+    fun openInBrowser(url: String) {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    }
+
     fun installApk(file: File) {
+        // Prefer PackageInstaller sessions — more reliable on Samsung / Android 13+.
+        runCatching { installWithPackageInstaller(file) }
+            .recoverCatching { installWithViewIntent(file) }
+            .getOrThrow()
+    }
+
+    private fun installWithPackageInstaller(file: File) {
+        val installer = context.packageManager.packageInstaller
+        val params = PackageInstaller.SessionParams(PackageInstaller.SessionParams.MODE_FULL_INSTALL)
+        if (Build.VERSION.SDK_INT >= 31) {
+            params.setRequireUserAction(PackageInstaller.SessionParams.USER_ACTION_REQUIRED)
+        }
+        val sessionId = installer.createSession(params)
+        installer.openSession(sessionId).use { session ->
+            file.inputStream().use { input ->
+                session.openWrite("soap-update.apk", 0, file.length()).use { output ->
+                    input.copyTo(output)
+                    session.fsync(output)
+                }
+            }
+            val callback = Intent(context, UpdateInstallReceiver::class.java).apply {
+                action = UpdateInstallReceiver.ACTION_INSTALL_COMPLETE
+            }
+            val pending = PendingIntent.getBroadcast(
+                context,
+                sessionId,
+                callback,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            )
+            session.commit(pending.intentSender)
+        }
+    }
+
+    private fun installWithViewIntent(file: File) {
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
@@ -221,7 +292,81 @@ class AppUpdateManager(
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
+        // Explicitly grant to common package-installer packages (Samsung/Pixel/etc.).
+        listOf(
+            "com.android.packageinstaller",
+            "com.google.android.packageinstaller",
+            "com.samsung.android.packageinstaller"
+        ).forEach { pkg ->
+            runCatching {
+                context.grantUriPermission(pkg, uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        }
         context.startActivity(intent)
+    }
+
+    fun signaturesCompatible(apkFile: File): Boolean {
+        val installed = installedSignatureDigests()
+        if (installed.isEmpty()) return true
+        val incoming = archiveSignatureDigests(apkFile)
+        if (incoming.isEmpty()) return true
+        return installed.intersect(incoming).isNotEmpty()
+    }
+
+    private fun installedSignatureDigests(): Set<String> {
+        return runCatching {
+            val pm = context.packageManager
+            if (Build.VERSION.SDK_INT >= 28) {
+                val info = pm.getPackageInfo(
+                    context.packageName,
+                    PackageManager.GET_SIGNING_CERTIFICATES
+                )
+                val signingInfo = info.signingInfo ?: return emptySet()
+                val sigs = if (signingInfo.hasMultipleSigners()) {
+                    signingInfo.apkContentsSigners
+                } else {
+                    signingInfo.signingCertificateHistory
+                }
+                sigs.map { sha256(it.toByteArray()) }.toSet()
+            } else {
+                @Suppress("DEPRECATION")
+                val info = pm.getPackageInfo(context.packageName, PackageManager.GET_SIGNATURES)
+                @Suppress("DEPRECATION")
+                info.signatures.orEmpty().map { sha256(it.toByteArray()) }.toSet()
+            }
+        }.getOrDefault(emptySet())
+    }
+
+    private fun archiveSignatureDigests(apkFile: File): Set<String> {
+        return runCatching {
+            val pm = context.packageManager
+            if (Build.VERSION.SDK_INT >= 28) {
+                val info = pm.getPackageArchiveInfo(
+                    apkFile.absolutePath,
+                    PackageManager.GET_SIGNING_CERTIFICATES
+                ) ?: return emptySet()
+                val signingInfo = info.signingInfo ?: return emptySet()
+                val sigs = if (signingInfo.hasMultipleSigners()) {
+                    signingInfo.apkContentsSigners
+                } else {
+                    signingInfo.signingCertificateHistory
+                }
+                sigs.map { sha256(it.toByteArray()) }.toSet()
+            } else {
+                @Suppress("DEPRECATION")
+                val info = pm.getPackageArchiveInfo(
+                    apkFile.absolutePath,
+                    PackageManager.GET_SIGNATURES
+                ) ?: return emptySet()
+                @Suppress("DEPRECATION")
+                info.signatures.orEmpty().map { sha256(it.toByteArray()) }.toSet()
+            }
+        }.getOrDefault(emptySet())
+    }
+
+    private fun sha256(bytes: ByteArray): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+        return digest.joinToString("") { "%02x".format(it) }
     }
 
     private fun openGithub(url: URL, token: String, accept: String): HttpURLConnection {
@@ -245,7 +390,6 @@ class AppUpdateManager(
             versionCodeLine.find(body.orEmpty())?.groupValues?.getOrNull(1)?.toLongOrNull()
                 ?.let { return it }
 
-            // Prefer explicit APK naming: SOAPBibleJournal-v10-1.4.2.apk
             Regex("""(?i)SOAPBibleJournal-v(\d+)""")
                 .find(assetName.orEmpty())
                 ?.groupValues?.getOrNull(1)?.toLongOrNull()
