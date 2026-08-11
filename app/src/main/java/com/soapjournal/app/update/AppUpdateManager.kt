@@ -245,7 +245,14 @@ class AppUpdateManager(
             versionCodeLine.find(body.orEmpty())?.groupValues?.getOrNull(1)?.toLongOrNull()
                 ?.let { return it }
 
-            val fromName = Regex("""(?i)(?:versionCode[_-]?|v)(\d+)""").find(assetName.orEmpty())
+            // Prefer explicit APK naming: SOAPBibleJournal-v10-1.4.2.apk
+            Regex("""(?i)SOAPBibleJournal-v(\d+)""")
+                .find(assetName.orEmpty())
+                ?.groupValues?.getOrNull(1)?.toLongOrNull()
+                ?.let { return it }
+
+            val fromName = Regex("""(?i)versionCode[_-]?(\d+)""")
+                .find(assetName.orEmpty())
                 ?.groupValues?.getOrNull(1)?.toLongOrNull()
             if (fromName != null) return fromName
 

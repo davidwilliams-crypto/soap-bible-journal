@@ -26,7 +26,7 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x gradlew
 
-      - name: Build debug APK
+      - name: Build signed debug APK (stable distribute keystore)
         run: ./gradlew :app:assembleDebug --no-daemon
 
       - name: Prepare APK artifact
@@ -42,6 +42,9 @@ jobs:
           echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
           echo "version_name=$VERSION_NAME" >> "$GITHUB_OUTPUT"
           echo "path=dist/$NAME" >> "$GITHUB_OUTPUT"
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -1)
+          "$APKSIGNER" verify --print-certs "dist/$NAME" | tee /tmp/apk-certs.txt
+          grep -q "SOAP Bible Journal" /tmp/apk-certs.txt
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4
@@ -54,10 +57,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ steps.apk.outputs.path }}
-          body: |
-            versionCode=${{ steps.apk.outputs.version_code }}
-
-            SOAP Journal ${{ steps.apk.outputs.version_name }}
-          append_body: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
