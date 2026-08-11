@@ -203,7 +203,10 @@ class EntryEditorViewModel(
         inkPersistJob?.cancel()
         // Flush pending edits so leaving within the debounce window does not drop work.
         runBlocking {
-            flushPending(markSaved = dirtyInkSections.isNotEmpty())
+            val inkHasContent = dirtyInkSections.any { section ->
+                sectionInk[section]?.document?.strokes?.isNotEmpty() == true
+            }
+            flushPending(markSaved = inkHasContent)
         }
         super.onCleared()
     }
@@ -222,19 +225,22 @@ class EntryEditorViewModel(
         inkPersistJob?.cancel()
         inkPersistJob = viewModelScope.launch {
             delay(350)
-            flushInk(markSaved = true)
+            flushInk()
         }
     }
 
-    private suspend fun flushInk(markSaved: Boolean) {
+    private suspend fun flushInk() {
         val sections = dirtyInkSections.toList()
         dirtyInkSections.clear()
+        var anyContent = false
         sections.forEach { section ->
             val doc = sectionInk[section]?.document ?: InkDocument()
+            if (doc.strokes.isNotEmpty()) anyContent = true
             repository.saveInk(entryId, section, doc)
         }
         if (sections.isNotEmpty() || metadataDirty) {
-            persistMetadata(markSaved = markSaved)
+            // Clearing a canvas must not mark the day complete.
+            persistMetadata(markSaved = anyContent)
             metadataDirty = false
             entry = repository.getEntry(entryId)
         }
@@ -247,7 +253,7 @@ class EntryEditorViewModel(
             val doc = sectionInk[section]?.document ?: InkDocument()
             repository.saveInk(entryId, section, doc)
         }
-        if (metadataDirty || sections.isNotEmpty() || markSaved) {
+        if (metadataDirty || sections.isNotEmpty()) {
             persistMetadata(markSaved = markSaved)
             metadataDirty = false
         }
