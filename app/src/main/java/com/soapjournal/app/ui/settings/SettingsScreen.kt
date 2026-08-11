@@ -24,6 +24,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
@@ -193,9 +194,19 @@ fun SettingsScreen(
                 style = MaterialTheme.typography.bodyMedium
             )
             Text(
-                "Checks GitHub Releases for a newer APK, downloads it, then opens the system installer.",
+                "Checks GitHub Releases for a newer APK, downloads it, then opens the system installer. Because the repo is private, add a read-only GitHub token (Contents: Read).",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            OutlinedTextField(
+                value = prefs.githubUpdateToken,
+                onValueChange = { value ->
+                    scope.launch { container.prefs.setGithubUpdateToken(value) }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("GitHub token (private repo)") },
+                placeholder = { Text("ghp_… or github_pat_…") },
+                singleLine = true
             )
             OutlinedButton(
                 onClick = {

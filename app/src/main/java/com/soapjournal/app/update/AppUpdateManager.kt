@@ -20,6 +20,7 @@ data class AvailableUpdate(
     val versionName: String,
     val versionCode: Int,
     val apkUrl: String,
+    val apkAssetApiUrl: String?,
     val releaseNotes: String,
     val htmlUrl: String
 )
@@ -33,17 +34,21 @@ sealed class UpdateCheckResult {
 /**
  * Checks GitHub Releases for a newer APK and installs it via the system package installer.
  *
+ * Because this repository is private, pass a GitHub token with `contents: read`
+ * (fine-grained PAT or classic token) so the phone can see releases.
+ *
  * Publish flow:
  * 1. Bump versionCode / versionName in app/build.gradle.kts
- * 2. Build an APK and create a GitHub Release tagged like v1.1.0
- * 3. Put `versionCode=2` in the release body
+ * 2. Build an APK and create a GitHub Release tagged like v1.2.0
+ * 3. Put `versionCode=N` in the release body
  * 4. Attach the `.apk` as a release asset
  */
 class AppUpdateManager(
     private val context: Context,
     private val gson: Gson = Gson(),
     private val owner: String = BuildConfig.UPDATE_GITHUB_OWNER,
-    private val repo: String = BuildConfig.UPDATE_GITHUB_REPO
+    private val repo: String = BuildConfig.UPDATE_GITHUB_REPO,
+    private val tokenProvider: () -> String = { "" }
 ) {
     fun currentVersionName(): String = runCatching {
         val info = if (Build.VERSION.SDK_INT >= 33) {
@@ -76,17 +81,25 @@ class AppUpdateManager(
 
     suspend fun checkForUpdate(): UpdateCheckResult = withContext(Dispatchers.IO) {
         try {
+            val token = tokenProvider().trim()
             val url = URL("https://api.github.com/repos/$owner/$repo/releases/latest")
-            val connection = (url.openConnection() as HttpURLConnection).apply {
-                connectTimeout = 12_000
-                readTimeout = 12_000
-                requestMethod = "GET"
-                setRequestProperty("Accept", "application/vnd.github+json")
-                setRequestProperty("User-Agent", "SOAP-Bible-Journal/${BuildConfig.VERSION_NAME}")
-            }
+            val connection = openGithub(url, token, accept = "application/vnd.github+json")
             try {
                 when (connection.responseCode) {
-                    404 -> return@withContext UpdateCheckResult.UpToDate
+                    401, 403 -> {
+                        return@withContext UpdateCheckResult.Error(
+                            "GitHub auth failed. Add a read-only GitHub token in Settings (repo is private)."
+                        )
+                    }
+                    404 -> {
+                        return@withContext UpdateCheckResult.Error(
+                            if (token.isBlank()) {
+                                "No public release found. This repo is private — paste a GitHub token in Settings, or make the repo public."
+                            } else {
+                                "No GitHub release found (404). Publish a release with an APK attached."
+                            }
+                        )
+                    }
                     !in 200..299 -> {
                         return@withContext UpdateCheckResult.Error(
                             "GitHub returned HTTP ${connection.responseCode}"
@@ -101,14 +114,14 @@ class AppUpdateManager(
                 }
                 val apk = release.assets.orEmpty().firstOrNull {
                     it.name?.endsWith(".apk", ignoreCase = true) == true &&
-                        !it.browserDownloadUrl.isNullOrBlank()
+                        (!it.browserDownloadUrl.isNullOrBlank() || it.url != null)
                 } ?: return@withContext UpdateCheckResult.Error(
                     "Latest GitHub release has no APK asset attached"
                 )
 
                 val remoteCode = parseVersionCode(release.body, apk.name, release.tagName)
                     ?: return@withContext UpdateCheckResult.Error(
-                        "Add versionCode=N to the release body (e.g. versionCode=2)"
+                        "Add versionCode=N to the release body (e.g. versionCode=3)"
                     )
                 val current = currentVersionCode()
                 if (remoteCode <= current) {
@@ -120,7 +133,8 @@ class AppUpdateManager(
                         versionName = release.tagName?.removePrefix("v").orEmpty()
                             .ifBlank { release.name.orEmpty().ifBlank { remoteCode.toString() } },
                         versionCode = remoteCode.toInt(),
-                        apkUrl = apk.browserDownloadUrl!!,
+                        apkUrl = apk.browserDownloadUrl.orEmpty(),
+                        apkAssetApiUrl = apk.url,
                         releaseNotes = release.body.orEmpty().trim(),
                         htmlUrl = release.htmlUrl.orEmpty()
                     )
@@ -137,16 +151,26 @@ class AppUpdateManager(
         update: AvailableUpdate,
         onProgress: (downloaded: Long, total: Long) -> Unit = { _, _ -> }
     ): File = withContext(Dispatchers.IO) {
+        val token = tokenProvider().trim()
         val dir = File(context.cacheDir, "updates").also { it.mkdirs() }
         dir.listFiles()?.forEach { it.delete() }
         val outFile = File(dir, "soap-journal-update-${update.versionCode}.apk")
-        val connection = (URL(update.apkUrl).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 20_000
-            readTimeout = 60_000
+
+        // Private repos must download via the releases asset API URL with auth.
+        val downloadUrl = when {
+            token.isNotBlank() && !update.apkAssetApiUrl.isNullOrBlank() -> update.apkAssetApiUrl
+            update.apkUrl.isNotBlank() -> update.apkUrl
+            !update.apkAssetApiUrl.isNullOrBlank() -> update.apkAssetApiUrl
+            else -> error("No APK download URL on the release")
+        }
+
+        val connection = openGithub(
+            url = URL(downloadUrl),
+            token = token,
+            accept = "application/octet-stream"
+        ).apply {
             instanceFollowRedirects = true
-            requestMethod = "GET"
-            setRequestProperty("Accept", "application/octet-stream")
-            setRequestProperty("User-Agent", "SOAP-Bible-Journal/${BuildConfig.VERSION_NAME}")
+            readTimeout = 60_000
         }
         try {
             if (connection.responseCode !in 200..299) {
@@ -200,6 +224,20 @@ class AppUpdateManager(
         context.startActivity(intent)
     }
 
+    private fun openGithub(url: URL, token: String, accept: String): HttpURLConnection {
+        return (url.openConnection() as HttpURLConnection).apply {
+            connectTimeout = 20_000
+            readTimeout = 20_000
+            requestMethod = "GET"
+            setRequestProperty("Accept", accept)
+            setRequestProperty("User-Agent", "SOAP-Bible-Journal/${BuildConfig.VERSION_NAME}")
+            if (token.isNotBlank()) {
+                setRequestProperty("Authorization", "Bearer $token")
+                setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
+            }
+        }
+    }
+
     companion object {
         private val versionCodeLine = Regex("""(?im)^\s*versionCode\s*[:=]\s*(\d+)\s*$""")
 
@@ -207,12 +245,10 @@ class AppUpdateManager(
             versionCodeLine.find(body.orEmpty())?.groupValues?.getOrNull(1)?.toLongOrNull()
                 ?.let { return it }
 
-            // Prefer explicit "-v2" / "versionCode_2" patterns in the APK filename.
             val fromName = Regex("""(?i)(?:versionCode[_-]?|v)(\d+)""").find(assetName.orEmpty())
                 ?.groupValues?.getOrNull(1)?.toLongOrNull()
             if (fromName != null) return fromName
 
-            // Last resort: numeric tag like v2
             val tag = tagName?.removePrefix("v").orEmpty()
             return tag.toLongOrNull()
         }
@@ -230,6 +266,7 @@ class AppUpdateManager(
 
     private data class GithubAsset(
         @SerializedName("name") val name: String?,
+        @SerializedName("url") val url: String?,
         @SerializedName("browser_download_url") val browserDownloadUrl: String?
     )
 }

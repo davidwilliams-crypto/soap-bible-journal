@@ -25,7 +25,8 @@ data class UserPreferences(
     val planStartEpochDay: Long = LocalDate.now().toEpochDay(),
     val currentStreak: Int = 0,
     val longestStreak: Int = 0,
-    val lastCompletedEpochDay: Long = -1L
+    val lastCompletedEpochDay: Long = -1L,
+    val githubUpdateToken: String = ""
 )
 
 class UserPreferencesRepository(private val context: Context) {
@@ -41,6 +42,7 @@ class UserPreferencesRepository(private val context: Context) {
         val currentStreak = intPreferencesKey("current_streak")
         val longestStreak = intPreferencesKey("longest_streak")
         val lastCompleted = longPreferencesKey("last_completed_epoch_day")
+        val githubUpdateToken = stringPreferencesKey("github_update_token")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
@@ -57,7 +59,8 @@ class UserPreferencesRepository(private val context: Context) {
             planStartEpochDay = prefs[Keys.planStart] ?: LocalDate.now().toEpochDay(),
             currentStreak = prefs[Keys.currentStreak] ?: 0,
             longestStreak = prefs[Keys.longestStreak] ?: 0,
-            lastCompletedEpochDay = prefs[Keys.lastCompleted] ?: -1L
+            lastCompletedEpochDay = prefs[Keys.lastCompleted] ?: -1L,
+            githubUpdateToken = prefs[Keys.githubUpdateToken].orEmpty()
         )
     }
 
@@ -102,6 +105,17 @@ class UserPreferencesRepository(private val context: Context) {
 
     suspend fun setPlanStart(date: LocalDate) {
         context.dataStore.edit { it[Keys.planStart] = date.toEpochDay() }
+    }
+
+    suspend fun setGithubUpdateToken(token: String) {
+        context.dataStore.edit { prefs ->
+            val cleaned = token.trim()
+            if (cleaned.isEmpty()) {
+                prefs.remove(Keys.githubUpdateToken)
+            } else {
+                prefs[Keys.githubUpdateToken] = cleaned
+            }
+        }
     }
 
     suspend fun recordDailyCompletion(date: LocalDate = LocalDate.now()) {
