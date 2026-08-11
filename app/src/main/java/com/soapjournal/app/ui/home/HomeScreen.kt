@@ -115,7 +115,7 @@ fun HomeScreen(
                 Text(votd.verse.reference, style = MaterialTheme.typography.labelLarge)
                 Text(votd.verse.text, style = MaterialTheme.typography.bodyLarge)
                 Text(
-                    "KJV · ${prefs.bibleVersion.displayName} preferred for reading",
+                    "${prefs.bibleVersion.displayName} preferred · VOTD shown in KJV offline",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

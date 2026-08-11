@@ -20,8 +20,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -45,6 +49,11 @@ fun ReadingPlanScreen(
     val today = ReadingPlan.dayFor(start)
     val upcoming = ((today.dayIndex)..(today.dayIndex + 13).coerceAtMost(ReadingPlan.TOTAL_DAYS - 1))
         .map { ReadingPlan.day(it) }
+    var passageText by remember(today.dayIndex, prefs.bibleVersion) { mutableStateOf("") }
+
+    LaunchedEffect(today.dayIndex, prefs.bibleVersion, prefs.planStartEpochDay) {
+        passageText = container.bible.passageText(today.passages, prefs.bibleVersion)
+    }
 
     Scaffold(
         topBar = {
@@ -75,7 +84,6 @@ fun ReadingPlanScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             Text("Today: ${today.label}", style = MaterialTheme.typography.titleLarge)
-            val passageText = container.bible.passageText(today.passages, prefs.bibleVersion)
             if (passageText.isNotBlank()) {
                 Text(
                     passageText.take(500) + if (passageText.length > 500) "…" else "",
@@ -83,7 +91,7 @@ fun ReadingPlanScreen(
                 )
             } else {
                 Text(
-                    "Open your preferred Bible for the full chapter text, or use bundled KJV samples where available.",
+                    "Loading ${prefs.bibleVersion.displayName} online, or open Bible for full text. Offline uses KJV samples when available.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -91,9 +99,12 @@ fun ReadingPlanScreen(
             Button(
                 onClick = {
                     scope.launch {
+                        val text = passageText.ifBlank {
+                            container.bible.passageText(today.passages, prefs.bibleVersion)
+                        }
                         val entry = container.repository.getOrCreateTodayEntry(
                             scriptureReference = today.label,
-                            scriptureText = passageText,
+                            scriptureText = text,
                             readingPlanDay = today.dayIndex
                         )
                         onOpenEntry(entry.id)

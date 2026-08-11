@@ -1,6 +1,18 @@
 package com.soapjournal.app.data.bible
 
-enum class BibleVersion(val displayName: String, val offlineAvailable: Boolean) {
+enum class BibleVersion(
+    val displayName: String,
+    val offlineAvailable: Boolean,
+    /** Remote API slug when this version can be fetched online. */
+    val onlineSlug: String? = null,
+    val copyrightNotice: String? = null
+) {
+    CSB(
+        displayName = "CSB",
+        offlineAvailable = false,
+        onlineSlug = "CSB17",
+        copyrightNotice = "Scripture quotations marked CSB have been taken from the Christian Standard Bible®, Copyright © 2017 by Holman Bible Publishers. Used by permission. Christian Standard Bible® and CSB® are federally registered trademarks of Holman Bible Publishers."
+    ),
     ESV("ESV", false),
     NIV("NIV", false),
     NLT("NLT", false),
@@ -10,9 +22,13 @@ enum class BibleVersion(val displayName: String, val offlineAvailable: Boolean) 
     KJV("KJV", true),
     NKJV("NKJV", false);
 
+    val onlineAvailable: Boolean get() = onlineSlug != null
+
     companion object {
+        val PREFERRED_DEFAULT: BibleVersion = CSB
+
         fun fromName(name: String): BibleVersion =
-            entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: KJV
+            entries.firstOrNull { it.name.equals(name, ignoreCase = true) } ?: PREFERRED_DEFAULT
     }
 }
 

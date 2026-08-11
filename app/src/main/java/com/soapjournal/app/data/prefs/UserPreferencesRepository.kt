@@ -16,7 +16,7 @@ private val Context.dataStore by preferencesDataStore("soap_prefs")
 
 data class UserPreferences(
     val darkTheme: Boolean = false,
-    val bibleVersion: BibleVersion = BibleVersion.KJV,
+    val bibleVersion: BibleVersion = BibleVersion.PREFERRED_DEFAULT,
     val remindersEnabled: Boolean = true,
     val reminderHour: Int = 8,
     val reminderMinute: Int = 0,
@@ -46,7 +46,9 @@ class UserPreferencesRepository(private val context: Context) {
     val preferences: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
         UserPreferences(
             darkTheme = prefs[Keys.darkTheme] ?: false,
-            bibleVersion = BibleVersion.fromName(prefs[Keys.bibleVersion] ?: BibleVersion.KJV.name),
+            bibleVersion = BibleVersion.fromName(
+                prefs[Keys.bibleVersion] ?: BibleVersion.PREFERRED_DEFAULT.name
+            ),
             remindersEnabled = prefs[Keys.remindersEnabled] ?: true,
             reminderHour = prefs[Keys.reminderHour] ?: 8,
             reminderMinute = prefs[Keys.reminderMinute] ?: 0,

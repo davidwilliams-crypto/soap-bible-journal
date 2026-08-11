@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,12 +25,14 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -38,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.soapjournal.app.AppContainer
+import com.soapjournal.app.data.bible.BibleVerse
 import com.soapjournal.app.data.bible.BibleVersion
 import com.soapjournal.app.data.prefs.UserPreferences
 import kotlinx.coroutines.launch
@@ -48,7 +52,7 @@ class BibleViewModel(private val container: AppContainer) : ViewModel() {
 
     fun chapters(book: String) = container.bible.chaptersFor(book)
 
-    fun verses(book: String, chapter: Int, version: BibleVersion) =
+    suspend fun verses(book: String, chapter: Int, version: BibleVersion): List<BibleVerse> =
         container.bible.chapter(book, chapter, version)
 
     fun setVersion(version: BibleVersion) {
@@ -81,8 +85,19 @@ fun BibleScreen(
     var versionMenu by remember { mutableStateOf(false) }
     var bookMenu by remember { mutableStateOf(false) }
     var chapterMenu by remember { mutableStateOf(false) }
+    var verses by remember { mutableStateOf<List<BibleVerse>>(emptyList()) }
+    var loading by remember { mutableStateOf(false) }
+    var usedOfflineFallback by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
-    val verses = vm.verses(book, chapter, prefs.bibleVersion)
+
+    LaunchedEffect(book, chapter, prefs.bibleVersion) {
+        loading = true
+        val loaded = vm.verses(book, chapter, prefs.bibleVersion)
+        verses = loaded
+        usedOfflineFallback = prefs.bibleVersion.onlineAvailable &&
+            (loaded.isEmpty() || loaded.firstOrNull()?.version != prefs.bibleVersion)
+        loading = false
+    }
 
     Scaffold(
         topBar = {
@@ -115,8 +130,14 @@ fun BibleScreen(
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    if (version.offlineAvailable) version.displayName
-                                    else "${version.displayName} (licensed — shows KJV offline)"
+                                    when {
+                                        version.onlineAvailable ->
+                                            "${version.displayName} (online preferred)"
+                                        version.offlineAvailable ->
+                                            "${version.displayName} (offline)"
+                                        else ->
+                                            "${version.displayName} (licensed — shows KJV offline)"
+                                    }
                                 )
                             },
                             onClick = {
@@ -170,47 +191,93 @@ fun BibleScreen(
                 }
             }
 
-            if (!prefs.bibleVersion.offlineAvailable) {
-                Text(
-                    "Offline reading uses public-domain KJV. ${prefs.bibleVersion.displayName} requires a licensed source.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            when {
+                prefs.bibleVersion.onlineAvailable && !usedOfflineFallback -> {
+                    Text(
+                        "${prefs.bibleVersion.displayName} loads online when you’re connected. Offline falls back to KJV.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                prefs.bibleVersion.onlineAvailable && usedOfflineFallback -> {
+                    Text(
+                        "Couldn’t reach online ${prefs.bibleVersion.displayName}. Showing offline KJV for this chapter when available.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                !prefs.bibleVersion.offlineAvailable -> {
+                    Text(
+                        "Offline reading uses public-domain KJV. ${prefs.bibleVersion.displayName} requires a licensed source.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
-            if (verses.isEmpty()) {
-                Text(
-                    "This chapter isn’t in the offline library yet. Try John 3, Psalm 23, or Genesis 1 — or journal from the reading plan.",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            } else {
-                TextButton(
-                    onClick = {
-                        val text = verses.joinToString("\n\n") { "${it.verse} ${it.text}" }
-                        onJournalPassage("$book $chapter", text)
+            when {
+                loading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator()
                     }
-                ) {
-                    Text("Start SOAP from this chapter")
                 }
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    items(verses, key = { it.reference }) { verse ->
-                        Row {
-                            Text(
-                                "${verse.verse}",
-                                style = MaterialTheme.typography.labelLarge,
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
-                            Text(
-                                verse.text,
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.weight(1f)
-                            )
-                            IconButton(
-                                onClick = {
-                                    scope.launch { vm.addToMemory(verse.reference, verse.text) }
+                verses.isEmpty() -> {
+                    Text(
+                        if (prefs.bibleVersion.onlineAvailable) {
+                            "No text loaded. Check your connection, or try again."
+                        } else {
+                            "This chapter isn’t in the offline library yet. Try John 3, Psalm 23, or Genesis 1 — or journal from the reading plan."
+                        },
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+                else -> {
+                    TextButton(
+                        onClick = {
+                            val text = verses.joinToString("\n\n") { "${it.verse} ${it.text}" }
+                            onJournalPassage("$book $chapter", text)
+                        }
+                    ) {
+                        Text("Start SOAP from this chapter")
+                    }
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(verses, key = { it.reference }) { verse ->
+                            Row {
+                                Text(
+                                    "${verse.verse}",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                                Text(
+                                    verse.text,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = {
+                                        scope.launch { vm.addToMemory(verse.reference, verse.text) }
+                                    }
+                                ) {
+                                    Icon(Icons.Outlined.Psychology, contentDescription = "Memorize")
                                 }
-                            ) {
-                                Icon(Icons.Outlined.Psychology, contentDescription = "Memorize")
+                            }
+                        }
+                        prefs.bibleVersion.copyrightNotice?.let { notice ->
+                            item {
+                                Text(
+                                    notice,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+                                )
                             }
                         }
                     }

@@ -1,5 +1,6 @@
 package com.soapjournal.app.data.bible
 
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -32,13 +33,13 @@ class BibleRepositoryTest {
     }
 
     @Test
-    fun chapterLookupIsCaseInsensitive() {
+    fun chapterLookupIsCaseInsensitive() = runBlocking {
         val verses = repo.chapter("john", 3, BibleVersion.KJV)
         assertTrue(verses.any { it.verse == 16 })
     }
 
     @Test
-    fun passageTextJoinsMultipleRefs() {
+    fun passageTextJoinsMultipleRefs() = runBlocking {
         val text = repo.passageText(
             listOf(
                 PassageRef("John", 3, 3, startVerse = 16, endVerse = 16),
@@ -48,5 +49,28 @@ class BibleRepositoryTest {
         )
         assertTrue(text.contains("God so loved the world"))
         assertTrue(text.contains("my shepherd"))
+    }
+
+    @Test
+    fun preferredDefaultIsCsb() {
+        assertEquals(BibleVersion.CSB, BibleVersion.PREFERRED_DEFAULT)
+        assertTrue(BibleVersion.CSB.onlineAvailable)
+        assertEquals("CSB17", BibleVersion.CSB.onlineSlug)
+    }
+
+    @Test
+    fun canonIncludesFullProtestantBible() {
+        assertEquals(66, BibleCanon.books.size)
+        assertEquals(43, BibleCanon.bookId("John"))
+        assertEquals(150, BibleCanon.find("Psalms")?.chapters)
+        assertEquals(21, BibleCanon.chaptersFor("John").size)
+    }
+
+    @Test
+    fun cleansRemoteVerseHtml() {
+        val cleaned = OnlineBibleClient.cleanVerseText(
+            "For God loved <sup>ⓜ</sup>the world in this way: <sup>[5]</sup>He gave his Son."
+        )
+        assertEquals("For God loved the world in this way: He gave his Son.", cleaned)
     }
 }
