@@ -22,14 +22,20 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.soapjournal.app.ui.components.ConfirmActionDialog
 import com.soapjournal.app.ui.share.AccountabilityShare
+import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -42,11 +48,28 @@ fun HistoryScreen(
 ) {
     val entries by viewModel.entries.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val surfaces = LocalJournalSurfaces.current
+    var pendingDeleteId by remember { mutableStateOf<Long?>(null) }
+
+    pendingDeleteId?.let { id ->
+        ConfirmActionDialog(
+            title = "Delete this entry?",
+            body = "The SOAP pages for this day will be removed. This cannot be undone.",
+            confirmLabel = "Delete",
+            onConfirm = {
+                viewModel.delete(id)
+                pendingDeleteId = null
+            },
+            onDismiss = { pendingDeleteId = null }
+        )
+    }
 
     Scaffold(
+        containerColor = surfaces.paper,
         topBar = {
             TopAppBar(
-                title = { Text("Entry management") },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = surfaces.paper),
+                title = { Text("Journal", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
@@ -59,7 +82,7 @@ fun HistoryScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp)
+                .padding(horizontal = 20.dp)
         ) {
             OutlinedTextField(
                 value = viewModel.query,
@@ -81,14 +104,14 @@ fun HistoryScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
-                        if (searching) "No matching entries" else "No journal entries yet",
-                        style = MaterialTheme.typography.titleLarge
+                        if (searching) "No matching entries" else "Your journal is empty",
+                        style = MaterialTheme.typography.headlineSmall
                     )
                     Text(
                         if (searching) {
                             "Try a different reference or tag."
                         } else {
-                            "Start a SOAP entry to begin journaling."
+                            "Begin a SOAP entry — the pages will gather here."
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -97,7 +120,7 @@ fun HistoryScreen(
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     items(entries, key = { it.id }) { entry ->
                         val date = LocalDate.ofEpochDay(entry.entryDateEpochDay)
@@ -105,7 +128,7 @@ fun HistoryScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onOpenEntry(entry.id) }
-                                .padding(vertical = 10.dp, horizontal = 4.dp),
+                                .padding(vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
@@ -115,7 +138,11 @@ fun HistoryScreen(
                                 )
                                 Text(
                                     text = buildString {
-                                        append(date.format(DateTimeFormatter.ofPattern("MMM d, yyyy")))
+                                        append(
+                                            date.format(
+                                                DateTimeFormatter.ofPattern("MMM d, yyyy")
+                                            )
+                                        )
                                         if (entry.tags.isNotBlank()) {
                                             append(" · ")
                                             append(entry.tags)
@@ -131,9 +158,12 @@ fun HistoryScreen(
                             IconButton(onClick = {
                                 AccountabilityShare.shareReflection(context, entry)
                             }) {
-                                Icon(Icons.Outlined.Share, contentDescription = "Share with partners")
+                                Icon(
+                                    Icons.Outlined.Share,
+                                    contentDescription = "Share with partners"
+                                )
                             }
-                            IconButton(onClick = { viewModel.delete(entry.id) }) {
+                            IconButton(onClick = { pendingDeleteId = entry.id }) {
                                 Icon(Icons.Outlined.Delete, contentDescription = "Delete")
                             }
                         }

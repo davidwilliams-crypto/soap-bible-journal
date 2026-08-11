@@ -12,7 +12,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.TextStyle
 import com.soapjournal.app.data.bible.BibleVerse
-import com.soapjournal.app.ui.theme.JesusRed
+import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 
 @Composable
 fun RedLetterVerseText(
@@ -21,13 +21,14 @@ fun RedLetterVerseText(
     style: TextStyle = LocalTextStyle.current,
     narratorColor: Color = LocalContentColor.current
 ) {
+    val christColor = LocalJournalSurfaces.current.jesusRed
     Text(
         text = buildAnnotatedString {
             verse.displaySpans().forEach { span ->
                 withStyle(
                     SpanStyle(
-                        color = if (span.wordsOfChrist) JesusRed else narratorColor,
-                        fontStyle = if (span.wordsOfChrist) FontStyle.Normal else FontStyle.Normal
+                        color = if (span.wordsOfChrist) christColor else narratorColor,
+                        fontStyle = FontStyle.Normal
                     )
                 ) {
                     append(span.text)

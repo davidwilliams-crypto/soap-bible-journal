@@ -1,5 +1,10 @@
 package com.soapjournal.app.ui.navigation
 
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -34,12 +39,24 @@ object Routes {
     fun editor(entryId: Long) = "editor/$entryId"
 }
 
+private val enter = fadeIn(tween(320)) + slideInVertically(tween(320)) { it / 30 }
+private val exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { -it / 40 }
+private val popEnter = fadeIn(tween(300)) + slideInVertically(tween(300)) { -it / 40 }
+private val popExit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { it / 30 }
+
 @Composable
 fun SoapNavHost(container: AppContainer) {
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
 
-    NavHost(navController = navController, startDestination = Routes.HOME) {
+    NavHost(
+        navController = navController,
+        startDestination = Routes.HOME,
+        enterTransition = { enter },
+        exitTransition = { exit },
+        popEnterTransition = { popEnter },
+        popExitTransition = { popExit }
+    ) {
         composable(Routes.HOME) {
             val vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory(container))
             HomeScreen(

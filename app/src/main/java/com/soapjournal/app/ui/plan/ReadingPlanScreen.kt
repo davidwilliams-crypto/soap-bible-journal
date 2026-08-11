@@ -19,6 +19,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.soapjournal.app.AppContainer
 import com.soapjournal.app.data.plan.ReadingPlan
+import com.soapjournal.app.ui.components.ConfirmActionDialog
+import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -45,20 +48,37 @@ fun ReadingPlanScreen(
         initialValue = com.soapjournal.app.data.prefs.UserPreferences()
     )
     val scope = rememberCoroutineScope()
+    val surfaces = LocalJournalSurfaces.current
     val start = LocalDate.ofEpochDay(prefs.planStartEpochDay)
     val today = ReadingPlan.dayFor(start)
     val upcoming = ((today.dayIndex)..(today.dayIndex + 13).coerceAtMost(ReadingPlan.TOTAL_DAYS - 1))
         .map { ReadingPlan.day(it) }
     var passageText by remember(today.dayIndex, prefs.bibleVersion) { mutableStateOf("") }
+    var confirmRestart by remember { mutableStateOf(false) }
 
     LaunchedEffect(today.dayIndex, prefs.bibleVersion, prefs.planStartEpochDay) {
         passageText = container.bible.passageText(today.passages, prefs.bibleVersion)
     }
 
+    if (confirmRestart) {
+        ConfirmActionDialog(
+            title = "Restart the plan?",
+            body = "Today becomes day 1 again. Your journal entries stay; only the plan calendar resets.",
+            confirmLabel = "Restart",
+            onConfirm = {
+                scope.launch { container.prefs.setPlanStart(LocalDate.now()) }
+                confirmRestart = false
+            },
+            onDismiss = { confirmRestart = false }
+        )
+    }
+
     Scaffold(
+        containerColor = surfaces.paper,
         topBar = {
             TopAppBar(
-                title = { Text("Reading Plan") },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = surfaces.paper),
+                title = { Text("Reading plan", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
@@ -71,27 +91,31 @@ fun ReadingPlanScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text("Whole Bible in 2 years", style = MaterialTheme.typography.headlineMedium)
+            Text(
+                "Whole Bible in two years",
+                style = MaterialTheme.typography.headlineMedium
+            )
             Text(
                 "Day ${today.dayIndex + 1} of ${ReadingPlan.TOTAL_DAYS}",
-                style = MaterialTheme.typography.titleMedium
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             LinearProgressIndicator(
                 progress = { ReadingPlan.progressFraction(start).coerceIn(0f, 1f) },
                 modifier = Modifier.fillMaxWidth()
             )
-            Text("Today: ${today.label}", style = MaterialTheme.typography.titleLarge)
+            Text(today.label, style = MaterialTheme.typography.headlineSmall)
             if (passageText.isNotBlank()) {
                 Text(
                     passageText.take(500) + if (passageText.length > 500) "…" else "",
-                    style = MaterialTheme.typography.bodyMedium
+                    style = MaterialTheme.typography.bodyLarge
                 )
             } else {
                 Text(
-                    "Loading ${prefs.bibleVersion.displayName} online, or open Bible for full text. Offline uses KJV samples when available.",
+                    "Loading ${prefs.bibleVersion.displayName}… Offline uses KJV samples when available.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -109,25 +133,31 @@ fun ReadingPlanScreen(
                         )
                         onOpenEntry(entry.id)
                     }
-                }
+                },
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Journal today's passage (SOAP)")
+                Text("Journal today’s passage")
             }
-            TextButton(
-                onClick = {
-                    scope.launch { container.prefs.setPlanStart(LocalDate.now()) }
-                }
-            ) {
+            TextButton(onClick = { confirmRestart = true }) {
                 Text("Restart plan from today")
             }
 
-            Text("Next two weeks", style = MaterialTheme.typography.titleMedium)
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "NEXT TWO WEEKS",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.secondary,
+                modifier = Modifier.padding(top = 8.dp)
+            )
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 items(upcoming, key = { it.dayIndex }) { day ->
-                    Text(
-                        "Day ${day.dayIndex + 1}: ${day.label}",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
+                    Column {
+                        Text(
+                            "Day ${day.dayIndex + 1}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(day.label, style = MaterialTheme.typography.bodyLarge)
+                    }
                 }
             }
         }

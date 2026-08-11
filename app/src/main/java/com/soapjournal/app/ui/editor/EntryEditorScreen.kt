@@ -9,10 +9,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Redo
@@ -32,24 +35,31 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.soapjournal.app.data.SoapSection
+import com.soapjournal.app.ui.components.ConfirmActionDialog
 import com.soapjournal.app.ui.export.PdfExporter
 import com.soapjournal.app.ui.ink.InkCanvas
 import com.soapjournal.app.ui.ink.InkTool
 import com.soapjournal.app.ui.share.AccountabilityShare
+import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,6 +75,7 @@ fun EntryEditorScreen(
         initialPage = sections.indexOf(viewModel.selectedSection).coerceAtLeast(0),
         pageCount = { sections.size }
     )
+    val surfaces = LocalJournalSurfaces.current
 
     LaunchedEffect(pagerState.currentPage) {
         viewModel.selectSection(sections[pagerState.currentPage])
@@ -78,13 +89,21 @@ fun EntryEditorScreen(
     }
 
     Scaffold(
+        containerColor = surfaces.paper,
         topBar = {
             TopAppBar(
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = surfaces.paper,
+                    scrolledContainerColor = surfaces.paperDeep
+                ),
                 title = {
                     Column {
-                        Text("SOAP Entry")
                         Text(
-                            text = viewModel.scriptureReference.ifBlank { "Add a scripture reference" },
+                            "SOAP",
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Text(
+                            text = viewModel.scriptureReference.ifBlank { "Add scripture" },
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -127,17 +146,23 @@ fun EntryEditorScreen(
                                         ?: com.soapjournal.app.data.ink.InkDocument()
                                 }
                                 viewModel.saveNow()
-                                val uri = PdfExporter.exportEntry(context, entry.copy(
-                                    scriptureReference = viewModel.scriptureReference,
-                                    scriptureText = viewModel.scriptureText,
-                                    tags = viewModel.tags
-                                ), ink)
+                                val uri = PdfExporter.exportEntry(
+                                    context,
+                                    entry.copy(
+                                        scriptureReference = viewModel.scriptureReference,
+                                        scriptureText = viewModel.scriptureText,
+                                        tags = viewModel.tags
+                                    ),
+                                    ink
+                                )
                                 val share = Intent(Intent.ACTION_SEND).apply {
                                     type = "application/pdf"
                                     putExtra(Intent.EXTRA_STREAM, uri)
                                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 }
-                                context.startActivity(Intent.createChooser(share, "Export SOAP entry"))
+                                context.startActivity(
+                                    Intent.createChooser(share, "Export SOAP entry")
+                                )
                             }
                         }
                     ) {
@@ -164,15 +189,26 @@ fun EntryEditorScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
         ) {
-            TabRow(selectedTabIndex = pagerState.currentPage) {
+            ScrollableTabRow(
+                selectedTabIndex = pagerState.currentPage,
+                edgePadding = 12.dp,
+                containerColor = surfaces.paper,
+                divider = {}
+            ) {
                 sections.forEachIndexed { index, section ->
                     Tab(
                         selected = pagerState.currentPage == index,
                         onClick = {
                             scope.launch { pagerState.animateScrollToPage(index) }
                         },
-                        text = { Text(section.title.take(1)) }
+                        text = {
+                            Text(
+                                section.title,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
                     )
                 }
             }
@@ -203,15 +239,24 @@ private fun ScripturePane(viewModel: EntryEditorViewModel) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Text(SoapSection.SCRIPTURE.prompt, style = MaterialTheme.typography.titleMedium)
+        Text(
+            SoapSection.SCRIPTURE.prompt,
+            style = MaterialTheme.typography.headlineSmall
+        )
+        Text(
+            "Anchor this entry in the Word. Observation, Application, and Prayer wait on the next pages.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         OutlinedTextField(
             value = viewModel.scriptureReference,
             onValueChange = viewModel::updateReference,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Scripture reference") },
+            label = { Text("Reference") },
             placeholder = { Text("e.g. John 3:16–17") },
             singleLine = true
         )
@@ -220,9 +265,10 @@ private fun ScripturePane(viewModel: EntryEditorViewModel) {
             onValueChange = viewModel::updateScriptureText,
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
-            label = { Text("Passage text (optional)") },
-            placeholder = { Text("Paste or type the passage") }
+                .height(220.dp),
+            label = { Text("Passage") },
+            placeholder = { Text("Paste or type the passage") },
+            textStyle = MaterialTheme.typography.bodyLarge
         )
         OutlinedTextField(
             value = viewModel.tags,
@@ -233,13 +279,8 @@ private fun ScripturePane(viewModel: EntryEditorViewModel) {
             singleLine = true
         )
         TextButton(onClick = viewModel::addScriptureToMemory) {
-            Text("Add Scripture to memorization")
+            Text("Save Scripture for memorization")
         }
-        Text(
-            text = "Tip: use the tabs for Observation, Application, and Prayer to write with your stylus.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
     }
 }
 
@@ -249,17 +290,29 @@ private fun InkPane(
     viewModel: EntryEditorViewModel
 ) {
     val state = viewModel.sectionInk[section] ?: SectionInkState()
+    var confirmClear by remember { mutableStateOf(false) }
+
+    if (confirmClear) {
+        ConfirmActionDialog(
+            title = "Clear ${section.title.lowercase()}?",
+            body = "This removes the ink on this page. You can still undo right after if you clear by mistake — this confirms a full wipe.",
+            confirmLabel = "Clear page",
+            onConfirm = {
+                viewModel.clearSection(section)
+                confirmClear = false
+            },
+            onDismiss = { confirmClear = false }
+        )
+    }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Title + prompt on their own row so Observation ("What does it say?")
-        // is never crushed by the pen/eraser toolbar on narrow phones.
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            Text(section.title, style = MaterialTheme.typography.titleLarge)
+            Text(section.title, style = MaterialTheme.typography.headlineSmall)
             Text(
                 section.prompt,
                 style = MaterialTheme.typography.bodyLarge,
@@ -272,7 +325,7 @@ private fun InkPane(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             FilterChip(
                 selected = viewModel.tool == InkTool.PEN,
@@ -298,18 +351,18 @@ private fun InkPane(
             ) {
                 Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = "Redo")
             }
-            IconButton(onClick = { viewModel.clearSection(section) }) {
-                Icon(Icons.Outlined.Clear, contentDescription = "Clear")
+            IconButton(onClick = { confirmClear = true }) {
+                Icon(Icons.Outlined.Clear, contentDescription = "Clear page")
             }
         }
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("Thickness", style = MaterialTheme.typography.labelLarge)
+            Text("Stroke", style = MaterialTheme.typography.labelMedium)
             Spacer(modifier = Modifier.width(12.dp))
             Slider(
                 value = viewModel.strokeWidth,
@@ -321,7 +374,7 @@ private fun InkPane(
 
         if (section == SoapSection.APPLICATION || section == SoapSection.PRAYER) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp),
+                modifier = Modifier.padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 val checked = if (section == SoapSection.APPLICATION) {
@@ -350,7 +403,7 @@ private fun InkPane(
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(2.dp))
 
         InkCanvas(
             document = state.document,
