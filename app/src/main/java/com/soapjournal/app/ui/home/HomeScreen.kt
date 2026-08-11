@@ -1,46 +1,40 @@
 package com.soapjournal.app.ui.home
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoStories
-import androidx.compose.material.icons.outlined.EditNote
-import androidx.compose.material.icons.outlined.History
-import androidx.compose.material.icons.outlined.LocalFireDepartment
-import androidx.compose.material.icons.outlined.MenuBook
-import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.soapjournal.app.data.plan.ReadingPlan
 import com.soapjournal.app.ui.bible.RedLetterVerseText
+import com.soapjournal.app.ui.components.JournalAtmosphere
+import com.soapjournal.app.ui.components.RitualEnter
+import com.soapjournal.app.ui.components.ScriptureQuotation
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -62,197 +56,195 @@ fun HomeScreen(
     val today = LocalDate.now(ZoneId.systemDefault())
     val todayEntry = entries.firstOrNull { it.entryDateEpochDay == today.toEpochDay() }
     val reading = viewModel.todayReading(prefs)
-    val planProgress = ReadingPlan.progressFraction(LocalDate.ofEpochDay(prefs.planStartEpochDay))
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        contentAlignment = Alignment.TopCenter
-    ) {
+    JournalAtmosphere {
         Column(
             modifier = Modifier
-                .widthIn(max = 760.dp)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("SOAP Journal", style = MaterialTheme.typography.displaySmall)
-                    Text(
-                        today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
-                        style = MaterialTheme.typography.titleMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        Icons.Outlined.LocalFireDepartment,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary
-                    )
-                    Text("${prefs.currentStreak}", style = MaterialTheme.typography.titleLarge)
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "Settings")
-                    }
-                }
-            }
-
             Column(
                 modifier = Modifier
+                    .widthIn(max = 720.dp)
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.primaryContainer)
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(top = 12.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
-                Text("Verse of the Day", style = MaterialTheme.typography.titleMedium)
+                RitualEnter {
+                    // First viewport: one ritual composition — brand, date, invitation, CTA.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Spacer(modifier = Modifier.weight(1f))
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(
+                                Icons.Outlined.Settings,
+                                contentDescription = "Settings",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Text(
+                        "SOAP",
+                        style = MaterialTheme.typography.displayLarge,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Text(
+                        "Bible Journal",
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        if (todayEntry != null) {
+                            "Return to today’s reflection."
+                        } else {
+                            "Open the page. Meet the Word with pen in hand."
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(28.dp))
+                    Button(
+                        onClick = {
+                            if (todayEntry != null) onOpenEntry(todayEntry.id)
+                            else viewModel.openToday(onOpenEntry)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                    ) {
+                        Text(
+                            if (todayEntry != null) "Continue today’s SOAP" else "Begin today’s SOAP",
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                    if (todayEntry != null) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        TextButton(onClick = { viewModel.createNew(onOpenEntry) }) {
+                            Text("Start another entry")
+                        }
+                        val follow = buildString {
+                            if (todayEntry.applicationFollowThrough) append("Application kept  ·  ")
+                            else append("Application open  ·  ")
+                            if (todayEntry.prayerFollowThrough) append("Prayer kept")
+                            else append("Prayer open")
+                        }
+                        Text(
+                            follow,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(48.dp))
+
+                // Below the fold: scripture, then plan — quiet, not a dashboard.
                 when {
                     votdLoading && votd == null -> {
-                        CircularProgressIndicator(modifier = Modifier.padding(vertical = 8.dp))
+                        CircularProgressIndicator(
+                            modifier = Modifier.padding(vertical = 12.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
-                    else -> {
-                        val todayVerse = votd
-                        if (todayVerse != null) {
-                            val verse = todayVerse.verse
-                            Text(verse.reference, style = MaterialTheme.typography.labelLarge)
+                    votd != null -> {
+                        val todayVerse = votd!!
+                        val verse = todayVerse.verse
+                        ScriptureQuotation(
+                            eyebrow = "Verse of the day",
+                            reference = verse.reference
+                        ) {
                             RedLetterVerseText(
                                 verse = verse,
-                                style = MaterialTheme.typography.bodyLarge,
-                                narratorColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontStyle = FontStyle.Italic
+                                ),
+                                narratorColor = MaterialTheme.colorScheme.onBackground
                             )
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 if (todayVerse.fromOfflineFallback) {
                                     "Offline · ${verse.version.displayName}"
                                 } else {
                                     verse.version.displayName
                                 },
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                            TextButton(onClick = viewModel::addVotdToMemory) {
-                                Text("Add to memorization")
+                            TextButton(
+                                onClick = viewModel::addVotdToMemory,
+                                modifier = Modifier.padding(top = 4.dp)
+                            ) {
+                                Text("Save for memorization")
                             }
                         }
                     }
                 }
-            }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .clickable(onClick = onOpenPlan)
-                    .padding(18.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text("Today's reading plan", style = MaterialTheme.typography.titleMedium)
-                Text(reading.label, style = MaterialTheme.typography.headlineMedium)
-                Text(
-                    "Day ${reading.dayIndex + 1} of ${ReadingPlan.TOTAL_DAYS} · whole Bible in 2 years",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                LinearProgressIndicator(
-                    progress = { planProgress.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Button(onClick = { viewModel.openTodayFromPlan(onOpenEntry) }) {
-                    Icon(
-                        Icons.Outlined.EditNote,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                Spacer(modifier = Modifier.height(36.dp))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable(onClick = onOpenPlan),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        "TODAY’S READING",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary
                     )
                     Text(
-                        "Journal this passage (SOAP)",
-                        modifier = Modifier.padding(start = 8.dp)
+                        reading.label,
+                        style = MaterialTheme.typography.headlineSmall
                     )
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FilledTonalButton(onClick = onOpenBible, modifier = Modifier.weight(1f)) {
-                    Icon(
-                        Icons.Outlined.MenuBook,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                    Text(
+                        "Day ${reading.dayIndex + 1} of ${ReadingPlan.TOTAL_DAYS}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text("Bible", modifier = Modifier.padding(start = 6.dp))
-                }
-                FilledTonalButton(onClick = onOpenMemory, modifier = Modifier.weight(1f)) {
-                    Icon(
-                        Icons.Outlined.Psychology,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text("Memorize", modifier = Modifier.padding(start = 6.dp))
-                }
-                FilledTonalButton(onClick = onOpenHistory, modifier = Modifier.weight(1f)) {
-                    Icon(
-                        Icons.Outlined.History,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Text("Entries", modifier = Modifier.padding(start = 6.dp))
-                }
-            }
-
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f))
-                    .padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Text(
-                    if (todayEntry != null) "Continue today's SOAP" else "Start a fresh SOAP entry",
-                    style = MaterialTheme.typography.titleMedium
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Button(
-                        onClick = {
-                            if (todayEntry != null) onOpenEntry(todayEntry.id)
-                            else viewModel.openToday(onOpenEntry)
-                        }
+                    TextButton(
+                        onClick = { viewModel.openTodayFromPlan(onOpenEntry) },
+                        modifier = Modifier.padding(top = 4.dp)
                     ) {
-                        Text(if (todayEntry != null) "Continue" else "New entry")
-                    }
-                    OutlinedButton(onClick = { viewModel.createNew(onOpenEntry) }) {
-                        Text("Another entry")
+                        Text("Journal this passage")
                     }
                 }
-                if (todayEntry != null) {
-                    val follow = buildString {
-                        if (todayEntry.applicationFollowThrough) append("Application ✓  ")
-                        else append("Application pending  ")
-                        if (todayEntry.prayerFollowThrough) append("Prayer ✓")
-                        else append("Prayer pending")
-                    }
-                    Text(follow, style = MaterialTheme.typography.bodyMedium)
-                }
-            }
 
-            Row(
-                modifier = Modifier.padding(top = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(Icons.Outlined.AutoStories, contentDescription = null)
-                Text(
-                    "Longest streak: ${prefs.longestStreak} days",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Spacer(modifier = Modifier.height(40.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    TextButton(onClick = onOpenBible) { Text("Bible") }
+                    TextButton(onClick = onOpenMemory) { Text("Memorize") }
+                    TextButton(onClick = onOpenHistory) { Text("Journal") }
+                }
+
+                if (prefs.currentStreak > 0) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        "${prefs.currentStreak}-day rhythm · longest ${prefs.longestStreak}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }

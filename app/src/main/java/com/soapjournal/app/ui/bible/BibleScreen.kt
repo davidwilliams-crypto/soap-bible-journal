@@ -1,17 +1,21 @@
 package com.soapjournal.app.ui.bible
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -19,11 +23,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,6 +48,7 @@ import com.soapjournal.app.AppContainer
 import com.soapjournal.app.data.bible.BibleVerse
 import com.soapjournal.app.data.bible.BibleVersion
 import com.soapjournal.app.data.prefs.UserPreferences
+import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 import kotlinx.coroutines.launch
 
 class BibleViewModel(private val container: AppContainer) : ViewModel() {
@@ -89,6 +94,7 @@ fun BibleScreen(
     var loading by remember { mutableStateOf(false) }
     var usedOfflineFallback by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val surfaces = LocalJournalSurfaces.current
 
     LaunchedEffect(book, chapter, prefs.bibleVersion) {
         loading = true
@@ -101,9 +107,20 @@ fun BibleScreen(
     }
 
     Scaffold(
+        containerColor = surfaces.paper,
         topBar = {
             TopAppBar(
-                title = { Text("Bible") },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = surfaces.paper),
+                title = {
+                    Column {
+                        Text("Scripture", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "$book $chapter",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
@@ -116,48 +133,16 @@ fun BibleScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Box {
-                OutlinedButton(
-                    onClick = { versionMenu = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Version: ${prefs.bibleVersion.displayName}")
-                }
-                DropdownMenu(expanded = versionMenu, onDismissRequest = { versionMenu = false }) {
-                    BibleVersion.entries.forEach { version ->
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    when {
-                                        version.onlineAvailable ->
-                                            "${version.displayName} (online)"
-                                        version.offlineAvailable ->
-                                            "${version.displayName} (offline only)"
-                                        else ->
-                                            "${version.displayName} (uses CSB online)"
-                                    }
-                                )
-                            },
-                            onClick = {
-                                vm.setVersion(version)
-                                versionMenu = false
-                            }
-                        )
-                    }
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(modifier = Modifier.weight(1f)) {
-                    OutlinedButton(
-                        onClick = { bookMenu = true },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(book)
-                    }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box {
+                    TextButton(onClick = { bookMenu = true }) { Text(book) }
                     DropdownMenu(expanded = bookMenu, onDismissRequest = { bookMenu = false }) {
                         vm.books.forEach { b ->
                             DropdownMenuItem(
@@ -171,14 +156,12 @@ fun BibleScreen(
                         }
                     }
                 }
-                Box(modifier = Modifier.weight(1f)) {
-                    OutlinedButton(
-                        onClick = { chapterMenu = true },
-                        modifier = Modifier.fillMaxWidth()
+                Box {
+                    TextButton(onClick = { chapterMenu = true }) { Text("Ch $chapter") }
+                    DropdownMenu(
+                        expanded = chapterMenu,
+                        onDismissRequest = { chapterMenu = false }
                     ) {
-                        Text("Ch $chapter")
-                    }
-                    DropdownMenu(expanded = chapterMenu, onDismissRequest = { chapterMenu = false }) {
                         vm.chapters(book).forEach { c ->
                             DropdownMenuItem(
                                 text = { Text(c.toString()) },
@@ -190,45 +173,62 @@ fun BibleScreen(
                         }
                     }
                 }
+                Spacer(modifier = Modifier.weight(1f))
+                Box {
+                    TextButton(onClick = { versionMenu = true }) {
+                        Text(prefs.bibleVersion.displayName)
+                    }
+                    DropdownMenu(
+                        expanded = versionMenu,
+                        onDismissRequest = { versionMenu = false }
+                    ) {
+                        BibleVersion.entries.forEach { version ->
+                            DropdownMenuItem(
+                                text = {
+                                    Text(
+                                        when {
+                                            version.onlineAvailable ->
+                                                "${version.displayName} (online)"
+                                            version.offlineAvailable ->
+                                                "${version.displayName} (offline)"
+                                            else ->
+                                                "${version.displayName} → CSB online"
+                                        }
+                                    )
+                                },
+                                onClick = {
+                                    vm.setVersion(version)
+                                    versionMenu = false
+                                }
+                            )
+                        }
+                    }
+                }
             }
 
-            when {
-                usedOfflineFallback -> {
-                    Text(
-                        "You’re offline — showing KJV. CSB/NLT load automatically when connected.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                prefs.bibleVersion.onlineAvailable -> {
-                    Text(
-                        "${prefs.bibleVersion.displayName} · words of Jesus in red",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                prefs.bibleVersion == BibleVersion.KJV -> {
-                    Text(
-                        "KJV is used only while offline. Online reading uses CSB.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                else -> {
-                    Text(
-                        "Online reading uses CSB. Words of Jesus appear in red.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+            val statusLine = when {
+                usedOfflineFallback ->
+                    "Offline · showing KJV"
+                prefs.bibleVersion.onlineAvailable ->
+                    "${prefs.bibleVersion.displayName} · words of Jesus in red"
+                prefs.bibleVersion == BibleVersion.KJV ->
+                    "KJV offline · CSB when online"
+                else ->
+                    "Online reading uses CSB"
             }
+            Text(
+                statusLine,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
+            )
 
             when {
                 loading -> {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 32.dp),
+                            .padding(top = 48.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         CircularProgressIndicator()
@@ -236,42 +236,58 @@ fun BibleScreen(
                 }
                 verses.isEmpty() -> {
                     Text(
-                        "No text loaded. Connect to the internet for CSB/NLT, or try again offline for KJV samples.",
-                        style = MaterialTheme.typography.bodyLarge
+                        "No text loaded. Connect for CSB/NLT, or try again offline for KJV.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(20.dp)
                     )
                 }
                 else -> {
-                    TextButton(
+                    Button(
                         onClick = {
                             val text = verses.joinToString("\n\n") { "${it.verse} ${it.text}" }
                             onJournalPassage("$book $chapter", text)
-                        }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp, vertical = 8.dp)
                     ) {
-                        Text("Start SOAP from this chapter")
+                        Text("Journal this chapter (SOAP)")
                     }
+
                     LazyColumn(
-                        modifier = Modifier.weight(1f),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .background(surfaces.paper)
+                            .padding(horizontal = 20.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
+                        item { Spacer(modifier = Modifier.height(8.dp)) }
                         items(verses, key = { it.reference }) { verse ->
-                            Row {
+                            Row(verticalAlignment = Alignment.Top) {
                                 Text(
                                     "${verse.verse}",
-                                    style = MaterialTheme.typography.labelLarge,
-                                    modifier = Modifier.padding(end = 8.dp)
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.secondary,
+                                    modifier = Modifier.padding(end = 10.dp, top = 4.dp)
                                 )
                                 RedLetterVerseText(
                                     verse = verse,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    narratorColor = MaterialTheme.colorScheme.onSurface,
+                                    narratorColor = MaterialTheme.colorScheme.onBackground,
                                     modifier = Modifier.weight(1f)
                                 )
                                 IconButton(
                                     onClick = {
-                                        scope.launch { vm.addToMemory(verse.reference, verse.text) }
+                                        scope.launch {
+                                            vm.addToMemory(verse.reference, verse.text)
+                                        }
                                     }
                                 ) {
-                                    Icon(Icons.Outlined.Psychology, contentDescription = "Memorize")
+                                    Icon(
+                                        Icons.Outlined.Psychology,
+                                        contentDescription = "Memorize"
+                                    )
                                 }
                             }
                         }
@@ -279,9 +295,9 @@ fun BibleScreen(
                             item {
                                 Text(
                                     notice,
-                                    style = MaterialTheme.typography.bodyMedium,
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+                                    modifier = Modifier.padding(top = 12.dp, bottom = 28.dp)
                                 )
                             }
                         }

@@ -35,9 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.soapjournal.app.data.ink.InkDocument
 import com.soapjournal.app.data.ink.InkPoint
 import com.soapjournal.app.data.ink.InkStroke
-import com.soapjournal.app.ui.theme.InkBrown
-import com.soapjournal.app.ui.theme.Paper
-import com.soapjournal.app.ui.theme.PaperDark
+import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 
 enum class InkTool {
     PEN,
@@ -57,7 +55,7 @@ fun InkCanvas(
     document: InkDocument,
     tool: InkTool,
     strokeWidth: Float,
-    inkColor: Color = InkBrown,
+    inkColor: Color? = null,
     onDocumentChange: (InkDocument) -> Unit,
     modifier: Modifier = Modifier,
     /**
@@ -66,6 +64,10 @@ fun InkCanvas(
      */
     stylusOnly: Boolean = false
 ) {
+    val surfaces = LocalJournalSurfaces.current
+    val resolvedInk = inkColor ?: surfaces.ink
+    val paperColor = surfaces.paper
+    val ruleColor = surfaces.rule
     var canvasWidth by remember { mutableFloatStateOf(document.canvasWidth) }
     var activeStroke by remember { mutableStateOf<InkStroke?>(null) }
     val currentDocument by rememberUpdatedState(document)
@@ -88,7 +90,7 @@ fun InkCanvas(
 
     Box(
         modifier = modifier
-            .background(Paper)
+            .background(paperColor)
             .nestedScroll(blockScrollWhileDrawing)
             .verticalScroll(scrollState)
             .onSizeChanged { size ->
@@ -99,7 +101,7 @@ fun InkCanvas(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(contentHeightDp)
-                .pointerInput(tool, strokeWidth, inkColor, stylusOnly) {
+                .pointerInput(tool, strokeWidth, resolvedInk, stylusOnly) {
                     awaitEachGesture {
                         // Initial pass so we win against scrollable / pager parents.
                         val down = awaitFirstDown(
@@ -133,7 +135,7 @@ fun InkCanvas(
                         val isEraser = tool == InkTool.ERASER || pointerType == PointerType.Eraser
                         activeStroke = InkStroke(
                             points = points.toList(),
-                            colorArgb = inkColor.toArgb(),
+                            colorArgb = resolvedInk.toArgb(),
                             width = if (isEraser) strokeWidth * 3f else strokeWidth,
                             isEraser = isEraser
                         )
@@ -195,7 +197,7 @@ fun InkCanvas(
             var y = lineSpacing
             while (y < size.height) {
                 drawLine(
-                    color = PaperDark,
+                    color = ruleColor,
                     start = Offset(0f, y),
                     end = Offset(size.width, y),
                     strokeWidth = 1.dp.toPx()
@@ -208,7 +210,7 @@ fun InkCanvas(
                 val path = stroke.toPath()
                 drawPath(
                     path = path,
-                    color = if (stroke.isEraser) Paper else Color(stroke.colorArgb),
+                    color = if (stroke.isEraser) paperColor else Color(stroke.colorArgb),
                     style = Stroke(
                         width = stroke.width,
                         cap = StrokeCap.Round,
