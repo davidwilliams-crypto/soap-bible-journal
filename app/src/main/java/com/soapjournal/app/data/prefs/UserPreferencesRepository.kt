@@ -9,6 +9,7 @@ import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.soapjournal.app.data.bible.BibleVersion
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
 
@@ -26,7 +27,24 @@ data class UserPreferences(
     val currentStreak: Int = 0,
     val longestStreak: Int = 0,
     val lastCompletedEpochDay: Long = -1L,
-    val githubUpdateToken: String = ""
+    val githubUpdateToken: String = "",
+    val backupFolderUri: String = "",
+    val lastBackupEpochMs: Long = 0L
+)
+
+/** Preferences included in journal backups (never includes secrets). */
+data class BackupPreferences(
+    val darkTheme: Boolean = false,
+    val bibleVersion: String = BibleVersion.PREFERRED_DEFAULT.name,
+    val remindersEnabled: Boolean = true,
+    val reminderHour: Int = 8,
+    val reminderMinute: Int = 0,
+    val followThroughEnabled: Boolean = true,
+    val followThroughHour: Int = 20,
+    val planStartEpochDay: Long = LocalDate.now().toEpochDay(),
+    val currentStreak: Int = 0,
+    val longestStreak: Int = 0,
+    val lastCompletedEpochDay: Long = -1L
 )
 
 class UserPreferencesRepository(private val context: Context) {
@@ -43,6 +61,8 @@ class UserPreferencesRepository(private val context: Context) {
         val longestStreak = intPreferencesKey("longest_streak")
         val lastCompleted = longPreferencesKey("last_completed_epoch_day")
         val githubUpdateToken = stringPreferencesKey("github_update_token")
+        val backupFolderUri = stringPreferencesKey("backup_folder_uri")
+        val lastBackupEpochMs = longPreferencesKey("last_backup_epoch_ms")
     }
 
     val preferences: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
@@ -60,8 +80,43 @@ class UserPreferencesRepository(private val context: Context) {
             currentStreak = prefs[Keys.currentStreak] ?: 0,
             longestStreak = prefs[Keys.longestStreak] ?: 0,
             lastCompletedEpochDay = prefs[Keys.lastCompleted] ?: -1L,
-            githubUpdateToken = prefs[Keys.githubUpdateToken].orEmpty()
+            githubUpdateToken = prefs[Keys.githubUpdateToken].orEmpty(),
+            backupFolderUri = prefs[Keys.backupFolderUri].orEmpty(),
+            lastBackupEpochMs = prefs[Keys.lastBackupEpochMs] ?: 0L
         )
+    }
+
+    suspend fun snapshotForBackup(): BackupPreferences {
+        val prefs = preferences.first()
+        return BackupPreferences(
+            darkTheme = prefs.darkTheme,
+            bibleVersion = prefs.bibleVersion.name,
+            remindersEnabled = prefs.remindersEnabled,
+            reminderHour = prefs.reminderHour,
+            reminderMinute = prefs.reminderMinute,
+            followThroughEnabled = prefs.followThroughEnabled,
+            followThroughHour = prefs.followThroughHour,
+            planStartEpochDay = prefs.planStartEpochDay,
+            currentStreak = prefs.currentStreak,
+            longestStreak = prefs.longestStreak,
+            lastCompletedEpochDay = prefs.lastCompletedEpochDay
+        )
+    }
+
+    suspend fun restoreFromBackup(backup: BackupPreferences) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.darkTheme] = backup.darkTheme
+            prefs[Keys.bibleVersion] = backup.bibleVersion
+            prefs[Keys.remindersEnabled] = backup.remindersEnabled
+            prefs[Keys.reminderHour] = backup.reminderHour
+            prefs[Keys.reminderMinute] = backup.reminderMinute
+            prefs[Keys.followThroughEnabled] = backup.followThroughEnabled
+            prefs[Keys.followThroughHour] = backup.followThroughHour
+            prefs[Keys.planStart] = backup.planStartEpochDay
+            prefs[Keys.currentStreak] = backup.currentStreak
+            prefs[Keys.longestStreak] = backup.longestStreak
+            prefs[Keys.lastCompleted] = backup.lastCompletedEpochDay
+        }
     }
 
     /**
@@ -116,6 +171,21 @@ class UserPreferencesRepository(private val context: Context) {
                 prefs[Keys.githubUpdateToken] = cleaned
             }
         }
+    }
+
+    suspend fun setBackupFolderUri(uri: String?) {
+        context.dataStore.edit { prefs ->
+            val cleaned = uri?.trim().orEmpty()
+            if (cleaned.isEmpty()) {
+                prefs.remove(Keys.backupFolderUri)
+            } else {
+                prefs[Keys.backupFolderUri] = cleaned
+            }
+        }
+    }
+
+    suspend fun setLastBackupEpochMs(epochMs: Long) {
+        context.dataStore.edit { it[Keys.lastBackupEpochMs] = epochMs }
     }
 
     suspend fun recordDailyCompletion(date: LocalDate = LocalDate.now()) {

@@ -45,8 +45,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.soapjournal.app.AppContainer
+import com.soapjournal.app.backup.BackupResult
 import com.soapjournal.app.update.AvailableUpdate
 import com.soapjournal.app.update.UpdateCheckResult
+import com.soapjournal.app.ui.components.ConfirmActionDialog
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 import kotlinx.coroutines.launch
 
@@ -72,6 +74,70 @@ fun SettingsScreen(
     var downloading by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableFloatStateOf(0f) }
     var showAdvancedUpdates by remember { mutableStateOf(prefs.githubUpdateToken.isNotBlank()) }
+    var backupBusy by remember { mutableStateOf(false) }
+    var backupStatus by remember { mutableStateOf<String?>(null) }
+    var confirmRestoreFromFolder by remember { mutableStateOf(false) }
+    var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
+
+    val chooseDriveFolder = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocumentTree()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        container.backup.takePersistableFolderPermission(uri)
+        scope.launch {
+            container.prefs.setBackupFolderUri(uri.toString())
+            backupStatus = "Google Drive folder linked. Tap Back up now whenever you want a copy."
+        }
+    }
+
+    val pickBackupFile = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        pendingRestoreUri = uri
+    }
+
+    if (confirmRestoreFromFolder) {
+        ConfirmActionDialog(
+            title = "Restore from Google Drive?",
+            body = "This replaces the journal currently on this phone with the latest backup in your Drive folder. Local notes that were never backed up will be lost.",
+            confirmLabel = "Restore",
+            onConfirm = {
+                confirmRestoreFromFolder = false
+                scope.launch {
+                    backupBusy = true
+                    backupStatus = "Restoring…"
+                    backupStatus = when (val result = container.backup.restoreLatestFromDriveFolder()) {
+                        is BackupResult.Success -> result.message
+                        is BackupResult.Error -> result.message
+                    }
+                    backupBusy = false
+                }
+            },
+            onDismiss = { confirmRestoreFromFolder = false }
+        )
+    }
+
+    pendingRestoreUri?.let { uri ->
+        ConfirmActionDialog(
+            title = "Restore this backup?",
+            body = "This replaces the journal currently on this phone with the selected backup file.",
+            confirmLabel = "Restore",
+            onConfirm = {
+                pendingRestoreUri = null
+                scope.launch {
+                    backupBusy = true
+                    backupStatus = "Restoring…"
+                    backupStatus = when (val result = container.backup.restoreFromUri(uri)) {
+                        is BackupResult.Success -> result.message
+                        is BackupResult.Error -> result.message
+                    }
+                    backupBusy = false
+                }
+            },
+            onDismiss = { pendingRestoreUri = null }
+        )
+    }
 
     Scaffold(
         containerColor = surfaces.paper,
@@ -214,6 +280,79 @@ fun SettingsScreen(
                     valueRange = 16f..22f,
                     steps = 5
                 )
+            }
+
+            SettingsSection("Google Drive backup") {
+                Text(
+                    "Save your SOAP entries, ink pages, memory verses, reading-plan progress, and streaks to a folder on Google Drive so you can restore them later.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Last backup: ${container.backup.formatLastBackup(prefs.lastBackupEpochMs)}",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    if (prefs.backupFolderUri.isNotBlank()) {
+                        "Drive folder linked"
+                    } else {
+                        "No Drive folder linked yet"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = { chooseDriveFolder.launch(null) },
+                    enabled = !backupBusy,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        if (prefs.backupFolderUri.isBlank()) {
+                            "Choose Google Drive folder"
+                        } else {
+                            "Change Google Drive folder"
+                        }
+                    )
+                }
+                Button(
+                    onClick = {
+                        scope.launch {
+                            backupBusy = true
+                            backupStatus = "Backing up…"
+                            backupStatus = when (val result = container.backup.backupToDriveFolder()) {
+                                is BackupResult.Success -> result.message
+                                is BackupResult.Error -> result.message
+                            }
+                            backupBusy = false
+                        }
+                    },
+                    enabled = !backupBusy && prefs.backupFolderUri.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (backupBusy) "Working…" else "Back up now")
+                }
+                OutlinedButton(
+                    onClick = { confirmRestoreFromFolder = true },
+                    enabled = !backupBusy && prefs.backupFolderUri.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Restore latest from Drive folder")
+                }
+                TextButton(
+                    onClick = {
+                        pickBackupFile.launch(arrayOf("application/zip", "application/octet-stream", "*/*"))
+                    },
+                    enabled = !backupBusy
+                ) {
+                    Text("Restore from a backup file…")
+                }
+                backupStatus?.let { status ->
+                    Text(
+                        status,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
 
             SettingsSection("Updates") {

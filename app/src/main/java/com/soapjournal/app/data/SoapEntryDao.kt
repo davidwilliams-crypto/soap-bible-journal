@@ -12,6 +12,9 @@ interface SoapEntryDao {
     @Query("SELECT * FROM soap_entries ORDER BY entryDateEpochDay DESC, updatedAtEpochMs DESC")
     fun observeAll(): Flow<List<SoapEntryEntity>>
 
+    @Query("SELECT * FROM soap_entries ORDER BY id ASC")
+    suspend fun getAll(): List<SoapEntryEntity>
+
     @Query("SELECT * FROM soap_entries WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): SoapEntryEntity?
 
@@ -37,6 +40,9 @@ interface SoapEntryDao {
 
     @Query("DELETE FROM soap_entries WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    @Query("DELETE FROM soap_entries")
+    suspend fun deleteAll()
 
     @Query(
         """

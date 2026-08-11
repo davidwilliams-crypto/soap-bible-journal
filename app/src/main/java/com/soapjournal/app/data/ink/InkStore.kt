@@ -11,6 +11,8 @@ class InkStore(context: Context) {
     private val root = File(context.filesDir, "ink").also { it.mkdirs() }
     private val gson = Gson()
 
+    fun rootDir(): File = root
+
     private fun fileFor(entryId: Long, section: SoapSection): File =
         File(root, "${entryId}_${section.key}.json")
 
@@ -32,5 +34,22 @@ class InkStore(context: Context) {
         SoapSection.entries.forEach { section ->
             fileFor(entryId, section).delete()
         }
+    }
+
+    suspend fun listFiles(): List<File> = withContext(Dispatchers.IO) {
+        root.listFiles { file -> file.isFile && file.extension.equals("json", true) }
+            ?.sortedBy { it.name }
+            .orEmpty()
+    }
+
+    suspend fun clearAll() = withContext(Dispatchers.IO) {
+        root.listFiles()?.forEach { it.delete() }
+    }
+
+    suspend fun writeBytes(fileName: String, bytes: ByteArray) = withContext(Dispatchers.IO) {
+        require(fileName.matches(Regex("""^\d+_[a-z]+\.json$"""))) {
+            "Unexpected ink backup filename: $fileName"
+        }
+        File(root, fileName).writeBytes(bytes)
     }
 }
