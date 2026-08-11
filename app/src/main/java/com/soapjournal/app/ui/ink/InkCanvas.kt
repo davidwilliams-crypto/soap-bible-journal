@@ -179,7 +179,7 @@ fun InkCanvas(
                                 finished
                             }
                             val latest = currentDocument
-                            val maxY = stroke.points.maxOf { it.y } + 120f
+                            val maxY = stroke.points.maxOf { it.y } + InkDefaults.AutoGrowPaddingPx
                             val newHeight = maxOf(latest.canvasHeight, maxY, minHeightPx)
                             currentOnChange(
                                 latest.copy(
