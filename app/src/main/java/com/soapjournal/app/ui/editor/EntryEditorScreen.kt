@@ -15,14 +15,14 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.Redo
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.outlined.Clear
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.Psychology
-import androidx.compose.material.icons.outlined.Redo
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Share
-import androidx.compose.material.icons.outlined.Undo
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -182,7 +182,8 @@ fun EntryEditorScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                userScrollEnabled = viewModel.selectedSection == SoapSection.SCRIPTURE
+                // Never let pager swipe steal stylus strokes on O/A/P writing pages.
+                userScrollEnabled = false
             ) { page ->
                 val section = sections[page]
                 when (section) {
@@ -250,21 +251,29 @@ private fun InkPane(
     val state = viewModel.sectionInk[section] ?: SectionInkState()
 
     Column(modifier = Modifier.fillMaxSize()) {
+        // Title + prompt on their own row so Observation ("What does it say?")
+        // is never crushed by the pen/eraser toolbar on narrow phones.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Text(section.title, style = MaterialTheme.typography.titleLarge)
+            Text(
+                section.prompt,
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(section.title, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    section.prompt,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
             FilterChip(
                 selected = viewModel.tool == InkTool.PEN,
                 onClick = { viewModel.chooseTool(InkTool.PEN) },
@@ -276,17 +285,18 @@ private fun InkPane(
                 onClick = { viewModel.chooseTool(InkTool.ERASER) },
                 label = { Text("Eraser") }
             )
+            Spacer(modifier = Modifier.weight(1f))
             IconButton(
                 onClick = { viewModel.undo(section) },
                 enabled = state.undoStack.isNotEmpty()
             ) {
-                Icon(Icons.Outlined.Undo, contentDescription = "Undo")
+                Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = "Undo")
             }
             IconButton(
                 onClick = { viewModel.redo(section) },
                 enabled = state.redoStack.isNotEmpty()
             ) {
-                Icon(Icons.Outlined.Redo, contentDescription = "Redo")
+                Icon(Icons.AutoMirrored.Outlined.Redo, contentDescription = "Redo")
             }
             IconButton(onClick = { viewModel.clearSection(section) }) {
                 Icon(Icons.Outlined.Clear, contentDescription = "Clear")
