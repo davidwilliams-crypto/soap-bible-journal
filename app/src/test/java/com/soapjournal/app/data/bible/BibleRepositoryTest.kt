@@ -3,6 +3,8 @@ package com.soapjournal.app.data.bible
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDate
@@ -62,10 +64,22 @@ class BibleRepositoryTest {
     }
 
     @Test
-    fun nltIsAvailableOnline() {
-        assertTrue(BibleVersion.NLT.onlineAvailable)
+    fun allListedVersionsHaveOnlineSlugs() {
+        BibleVersion.entries.forEach { version ->
+            assertNotNull(
+                "${version.name} must have an onlineSlug so it does not silently fall back to CSB",
+                version.onlineSlug
+            )
+            assertTrue(version.onlineAvailable)
+        }
+        assertEquals("ESV", BibleVersion.ESV.onlineSlug)
+        assertEquals("NIV", BibleVersion.NIV.onlineSlug)
+        assertEquals("NKJV", BibleVersion.NKJV.onlineSlug)
+        assertEquals("NASB", BibleVersion.NASB.onlineSlug)
+        assertEquals("AMP", BibleVersion.AMP.onlineSlug)
+        assertEquals("MSG", BibleVersion.MSG.onlineSlug)
+        assertEquals("KJV", BibleVersion.KJV.onlineSlug)
         assertEquals("NLT", BibleVersion.NLT.onlineSlug)
-        assertTrue(BibleVersion.NLT.copyrightNotice!!.contains("Tyndale"))
     }
 
     @Test
@@ -82,6 +96,14 @@ class BibleRepositoryTest {
             "For God loved <sup>ⓜ</sup>the world in this way: <sup>[5]</sup>He gave his Son."
         )
         assertEquals("For God loved the world in this way: He gave his Son.", cleaned)
+    }
+
+    @Test
+    fun cleansBreakTagsWithoutGluingWords() {
+        val cleaned = OnlineBibleClient.cleanVerseText(
+            "Jesus Teaches Nicodemus<br/>Now there was a man"
+        )
+        assertEquals("Jesus Teaches Nicodemus Now there was a man", cleaned)
     }
 
     @Test
@@ -121,5 +143,71 @@ class BibleRepositoryTest {
         val marked = WordsOfChristMarker.markChapter(verses)
         assertTrue(marked[0].displaySpans().any { it.wordsOfChrist })
         assertTrue(marked[1].displaySpans().all { it.wordsOfChrist })
+    }
+
+    @Test
+    fun doesNotMarkNicodemusSpeechAsChrist() {
+        val verses = listOf(
+            BibleVerse(
+                book = "John",
+                chapter = 3,
+                verse = 2,
+                text = "This man came to him at night and said, “Rabbi, we know that you are a teacher who has come from God.”"
+            ),
+            BibleVerse(
+                book = "John",
+                chapter = 3,
+                verse = 4,
+                text = "“How can anyone be born when he is old?” Nicodemus asked him. “Can he enter his mother’s womb a second time and be born?”"
+            )
+        )
+        val marked = WordsOfChristMarker.markChapter(verses)
+        assertTrue(marked[0].displaySpans().none { it.wordsOfChrist })
+        assertTrue(marked[1].displaySpans().none { it.wordsOfChrist })
+    }
+
+    @Test
+    fun marksPostAttributedJesusQuote() {
+        val verse = BibleVerse(
+            book = "John",
+            chapter = 3,
+            verse = 10,
+            text = "“Are you a teacher of Israel and don’t know these things?” Jesus replied."
+        )
+        val marked = WordsOfChristMarker.markChapter(listOf(verse)).first()
+        val christ = marked.displaySpans().filter { it.wordsOfChrist }.joinToString("") { it.text }
+        assertTrue(christ.contains("Are you a teacher"))
+        assertFalse(christ.contains("Jesus replied"))
+    }
+
+    @Test
+    fun marksFullRedLetterVersesEntirely() {
+        val verse = BibleVerse(
+            book = "Matthew",
+            chapter = 5,
+            verse = 3,
+            text = "“Blessed are the poor in spirit, for theirs is the kingdom of heaven."
+        )
+        val marked = WordsOfChristMarker.markChapter(listOf(verse)).first()
+        assertTrue(marked.displaySpans().all { it.wordsOfChrist })
+        assertEquals(RedLetterIndex.Kind.FULL, RedLetterIndex.kind("Matthew", 5, 3))
+    }
+
+    @Test
+    fun nonGospelVersesStayBlack() {
+        val verse = BibleVerse(
+            book = "Romans",
+            chapter = 8,
+            verse = 28,
+            text = "Jesus said, “All things work together for good.”"
+        )
+        val marked = WordsOfChristMarker.markChapter(listOf(verse)).first()
+        assertTrue(marked.displaySpans().none { it.wordsOfChrist })
+        assertNull(RedLetterIndex.kind("Romans", 8, 28))
+    }
+
+    @Test
+    fun johnThreeSixteenIsRedLetter() {
+        assertEquals(RedLetterIndex.Kind.FULL, RedLetterIndex.kind("John", 3, 16))
     }
 }

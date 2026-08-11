@@ -3,7 +3,7 @@ package com.soapjournal.app.data.bible
 enum class BibleVersion(
     val displayName: String,
     val offlineAvailable: Boolean,
-    /** Remote API slug when this version can be fetched online. */
+    /** Remote API slug when this version can be fetched online (bolls.life). */
     val onlineSlug: String? = null,
     val copyrightNotice: String? = null
 ) {
@@ -13,19 +13,54 @@ enum class BibleVersion(
         onlineSlug = "CSB17",
         copyrightNotice = "Scripture quotations marked CSB have been taken from the Christian Standard Bible®, Copyright © 2017 by Holman Bible Publishers. Used by permission. Christian Standard Bible® and CSB® are federally registered trademarks of Holman Bible Publishers."
     ),
-    ESV("ESV", false),
-    NIV("NIV", false),
+    ESV(
+        displayName = "ESV",
+        offlineAvailable = false,
+        onlineSlug = "ESV",
+        copyrightNotice = "Scripture quotations are from the ESV® Bible (The Holy Bible, English Standard Version®), © 2001 by Crossway, a publishing ministry of Good News Publishers. Used by permission. All rights reserved."
+    ),
+    NIV(
+        displayName = "NIV",
+        offlineAvailable = false,
+        onlineSlug = "NIV",
+        copyrightNotice = "Scripture quotations taken from The Holy Bible, New International Version®, NIV®. Copyright © 1973, 1978, 1984, 2011 by Biblica, Inc.® Used by permission. All rights reserved worldwide."
+    ),
     NLT(
         displayName = "NLT",
         offlineAvailable = false,
         onlineSlug = "NLT",
         copyrightNotice = "Scripture quotations marked NLT are taken from the Holy Bible, New Living Translation, copyright © 1996, 2004, 2015 by Tyndale House Foundation. Used by permission of Tyndale House Publishers, Inc., Carol Stream, Illinois 60188. All rights reserved."
     ),
-    MSG("MSG", false),
-    NASB("NASB", false),
-    AMP("AMP", false),
-    KJV("KJV", true),
-    NKJV("NKJV", false);
+    MSG(
+        displayName = "MSG",
+        offlineAvailable = false,
+        onlineSlug = "MSG",
+        copyrightNotice = "Scripture taken from THE MESSAGE. Copyright © 1993, 2002, 2018 by Eugene H. Peterson. Used by permission of NavPress. All rights reserved. Represented by Tyndale House Publishers, Inc."
+    ),
+    NASB(
+        displayName = "NASB",
+        offlineAvailable = false,
+        onlineSlug = "NASB",
+        copyrightNotice = "Scripture quotations taken from the New American Standard Bible® (NASB). Copyright © 1960, 1971, 1977, 1995, 2020 by The Lockman Foundation. Used by permission. All rights reserved."
+    ),
+    AMP(
+        displayName = "AMP",
+        offlineAvailable = false,
+        onlineSlug = "AMP",
+        copyrightNotice = "Scripture quotations taken from the Amplified® Bible, Copyright © 2015 by The Lockman Foundation. Used by permission."
+    ),
+    KJV(
+        displayName = "KJV",
+        offlineAvailable = true,
+        onlineSlug = "KJV",
+        copyrightNotice = "King James Version (public domain)."
+    ),
+    NKJV(
+        displayName = "NKJV",
+        offlineAvailable = false,
+        onlineSlug = "NKJV",
+        copyrightNotice = "Scripture taken from the New King James Version®. Copyright © 1982 by Thomas Nelson. Used by permission. All rights reserved."
+    );
 
     val onlineAvailable: Boolean get() = onlineSlug != null
 

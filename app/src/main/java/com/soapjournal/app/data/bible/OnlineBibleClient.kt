@@ -9,8 +9,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Fetches online Bible chapters (CSB/NLT). Offline KJV is handled only by
- * [BibleRepository] when the device has no network.
+ * Fetches online Bible chapters via bolls.life (CSB, ESV, NIV, NLT, MSG, NASB, AMP, KJV, NKJV).
+ * Offline KJV samples are handled by [BibleRepository] when the device has no network.
  */
 class OnlineBibleClient(
     private val gson: Gson = Gson(),
@@ -55,11 +55,15 @@ class OnlineBibleClient(
 
     companion object {
         private val superscript = Regex("(?is)<sup\\b[^>]*>.*?</sup>")
+        private val breakTag = Regex("(?is)<br\\s*/?>")
+        private val strongs = Regex("(?is)</?S>")
         private val htmlTag = Regex("<[^>]+>")
         private val whitespace = Regex("\\s+")
 
         fun cleanVerseText(raw: String): String =
             raw.replace(superscript, "")
+                .replace(breakTag, " ")
+                .replace(strongs, "")
                 .replace(htmlTag, "")
                 .replace('\u00a0', ' ')
                 .replace(whitespace, " ")
