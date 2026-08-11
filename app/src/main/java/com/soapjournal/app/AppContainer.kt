@@ -4,6 +4,7 @@ import android.content.Context
 import com.soapjournal.app.data.AppDatabase
 import com.soapjournal.app.data.JournalRepository
 import com.soapjournal.app.data.bible.BibleRepository
+import com.soapjournal.app.data.bible.NetworkStatus
 import com.soapjournal.app.data.ink.InkStore
 import com.soapjournal.app.data.prefs.UserPreferencesRepository
 import com.soapjournal.app.notifications.ReminderScheduler
@@ -22,7 +23,9 @@ class AppContainer(context: Context) {
     private var githubUpdateToken: String = ""
 
     val prefs = UserPreferencesRepository(appContext)
-    val bible = BibleRepository()
+    val bible = BibleRepository(
+        isOnline = { NetworkStatus.isOnline(appContext) }
+    )
     val repository = JournalRepository(
         dao = db.soapEntryDao(),
         inkStore = InkStore(appContext),

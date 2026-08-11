@@ -155,6 +155,16 @@ object KjvCorpus {
         )
     }.ifEmpty { verses.take(40) }
 
+    /** Stable VOTD reference list (text is loaded from CSB online when possible). */
+    val votdRefs: List<VotdRef> = votdPool.map { VotdRef(it.book, it.chapter, it.verse) }
+        .ifEmpty {
+            listOf(
+                VotdRef("John", 3, 16),
+                VotdRef("Psalm", 23, 1),
+                VotdRef("Philippians", 4, 13)
+            )
+        }
+
     private fun v(book: String, chapter: Int, verse: Int, text: String) =
         BibleVerse(book, chapter, verse, text, BibleVersion.KJV)
 }

@@ -9,8 +9,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Fetches online Bible chapters. CSB is loaded remotely (not bundled) and falls back
- * to offline KJV in [BibleRepository] when the network request fails.
+ * Fetches online Bible chapters (CSB/NLT). Offline KJV is handled only by
+ * [BibleRepository] when the device has no network.
  */
 class OnlineBibleClient(
     private val gson: Gson = Gson(),

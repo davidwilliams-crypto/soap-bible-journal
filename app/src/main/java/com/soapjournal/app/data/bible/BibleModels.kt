@@ -37,14 +37,23 @@ enum class BibleVersion(
     }
 }
 
+data class VerseSpan(
+    val text: String,
+    val wordsOfChrist: Boolean = false
+)
+
 data class BibleVerse(
     val book: String,
     val chapter: Int,
     val verse: Int,
     val text: String,
-    val version: BibleVersion = BibleVersion.KJV
+    val version: BibleVersion = BibleVersion.KJV,
+    val spans: List<VerseSpan> = listOf(VerseSpan(text, false))
 ) {
     val reference: String get() = "$book $chapter:$verse"
+
+    fun displaySpans(): List<VerseSpan> =
+        spans.ifEmpty { listOf(VerseSpan(text, false)) }
 }
 
 data class PassageRef(
@@ -69,5 +78,14 @@ data class PassageRef(
 
 data class VerseOfTheDay(
     val verse: BibleVerse,
-    val dateEpochDay: Long
+    val dateEpochDay: Long,
+    val fromOfflineFallback: Boolean = false
 )
+
+data class VotdRef(
+    val book: String,
+    val chapter: Int,
+    val verse: Int
+) {
+    val reference: String get() = "$book $chapter:$verse"
+}

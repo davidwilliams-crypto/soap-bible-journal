@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +40,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.soapjournal.app.data.plan.ReadingPlan
+import com.soapjournal.app.ui.bible.RedLetterVerseText
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -55,9 +57,10 @@ fun HomeScreen(
 ) {
     val entries by viewModel.entries.collectAsStateWithLifecycle()
     val prefs by viewModel.preferences.collectAsStateWithLifecycle()
+    val votd by viewModel.verseOfTheDay.collectAsStateWithLifecycle()
+    val votdLoading by viewModel.votdLoading.collectAsStateWithLifecycle()
     val today = LocalDate.now(ZoneId.systemDefault())
     val todayEntry = entries.firstOrNull { it.entryDateEpochDay == today.toEpochDay() }
-    val votd = viewModel.verseOfTheDay
     val reading = viewModel.todayReading(prefs)
     val planProgress = ReadingPlan.progressFraction(LocalDate.ofEpochDay(prefs.planStartEpochDay))
 
@@ -112,15 +115,34 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("Verse of the Day", style = MaterialTheme.typography.titleMedium)
-                Text(votd.verse.reference, style = MaterialTheme.typography.labelLarge)
-                Text(votd.verse.text, style = MaterialTheme.typography.bodyLarge)
-                Text(
-                    "${prefs.bibleVersion.displayName} preferred · VOTD shown in KJV offline",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                TextButton(onClick = viewModel::addVotdToMemory) {
-                    Text("Add to memorization")
+                when {
+                    votdLoading && votd == null -> {
+                        CircularProgressIndicator(modifier = Modifier.padding(vertical = 8.dp))
+                    }
+                    else -> {
+                        val todayVerse = votd
+                        if (todayVerse != null) {
+                            val verse = todayVerse.verse
+                            Text(verse.reference, style = MaterialTheme.typography.labelLarge)
+                            RedLetterVerseText(
+                                verse = verse,
+                                style = MaterialTheme.typography.bodyLarge,
+                                narratorColor = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Text(
+                                if (todayVerse.fromOfflineFallback) {
+                                    "Offline · ${verse.version.displayName}"
+                                } else {
+                                    verse.version.displayName
+                                },
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            TextButton(onClick = viewModel::addVotdToMemory) {
+                                Text("Add to memorization")
+                            }
+                        }
+                    }
                 }
             }
 

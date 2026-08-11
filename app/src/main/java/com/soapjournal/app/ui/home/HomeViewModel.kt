@@ -5,11 +5,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.soapjournal.app.AppContainer
 import com.soapjournal.app.data.SoapEntryEntity
+import com.soapjournal.app.data.bible.BibleVersion
 import com.soapjournal.app.data.bible.VerseOfTheDay
 import com.soapjournal.app.data.plan.ReadingPlan
 import com.soapjournal.app.data.prefs.UserPreferences
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -27,7 +30,30 @@ class HomeViewModel(
     val preferences: StateFlow<UserPreferences> = prefsRepo.preferences
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UserPreferences())
 
-    val verseOfTheDay: VerseOfTheDay = bible.verseOfTheDay()
+    private val _verseOfTheDay = MutableStateFlow<VerseOfTheDay?>(null)
+    val verseOfTheDay: StateFlow<VerseOfTheDay?> = _verseOfTheDay
+
+    private val _votdLoading = MutableStateFlow(true)
+    val votdLoading: StateFlow<Boolean> = _votdLoading
+
+    init {
+        viewModelScope.launch {
+            preferences.collectLatest { prefs ->
+                refreshVerseOfTheDay(prefs.bibleVersion)
+            }
+        }
+    }
+
+    fun refreshVerseOfTheDay(preferredVersion: BibleVersion = preferences.value.bibleVersion) {
+        viewModelScope.launch {
+            _votdLoading.value = true
+            _verseOfTheDay.value = bible.verseOfTheDay(
+                date = LocalDate.now(),
+                preferredVersion = preferredVersion
+            )
+            _votdLoading.value = false
+        }
+    }
 
     fun todayReading(prefs: UserPreferences): ReadingPlan.DayReading {
         val start = LocalDate.ofEpochDay(prefs.planStartEpochDay)
@@ -62,7 +88,8 @@ class HomeViewModel(
 
     fun addVotdToMemory() {
         viewModelScope.launch {
-            val v = verseOfTheDay.verse
+            val v = verseOfTheDay.value?.verse ?: return@launch
+            if (v.text.isBlank() || v.text.startsWith("Unable to load")) return@launch
             repository.addMemoryVerse(v.reference, v.text, source = "verse_of_the_day")
         }
     }

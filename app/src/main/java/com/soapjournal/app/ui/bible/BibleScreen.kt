@@ -94,8 +94,9 @@ fun BibleScreen(
         loading = true
         val loaded = vm.verses(book, chapter, prefs.bibleVersion)
         verses = loaded
-        usedOfflineFallback = prefs.bibleVersion.onlineAvailable &&
-            (loaded.isEmpty() || loaded.firstOrNull()?.version != prefs.bibleVersion)
+        usedOfflineFallback = loaded.isNotEmpty() &&
+            loaded.first().version == BibleVersion.KJV &&
+            prefs.bibleVersion != BibleVersion.KJV
         loading = false
     }
 
@@ -132,11 +133,11 @@ fun BibleScreen(
                                 Text(
                                     when {
                                         version.onlineAvailable ->
-                                            "${version.displayName} (online preferred)"
+                                            "${version.displayName} (online)"
                                         version.offlineAvailable ->
-                                            "${version.displayName} (offline)"
+                                            "${version.displayName} (offline only)"
                                         else ->
-                                            "${version.displayName} (licensed — shows KJV offline)"
+                                            "${version.displayName} (uses CSB online)"
                                     }
                                 )
                             },
@@ -192,23 +193,30 @@ fun BibleScreen(
             }
 
             when {
-                prefs.bibleVersion.onlineAvailable && !usedOfflineFallback -> {
+                usedOfflineFallback -> {
                     Text(
-                        "${prefs.bibleVersion.displayName} loads online when you’re connected. Offline falls back to KJV.",
+                        "You’re offline — showing KJV. CSB/NLT load automatically when connected.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                prefs.bibleVersion.onlineAvailable && usedOfflineFallback -> {
+                prefs.bibleVersion.onlineAvailable -> {
                     Text(
-                        "Couldn’t reach online ${prefs.bibleVersion.displayName}. Showing offline KJV for this chapter when available.",
+                        "${prefs.bibleVersion.displayName} · words of Jesus in red",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                !prefs.bibleVersion.offlineAvailable -> {
+                prefs.bibleVersion == BibleVersion.KJV -> {
                     Text(
-                        "Offline reading uses public-domain KJV. ${prefs.bibleVersion.displayName} requires a licensed source.",
+                        "KJV is used only while offline. Online reading uses CSB.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                else -> {
+                    Text(
+                        "Online reading uses CSB. Words of Jesus appear in red.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -228,11 +236,7 @@ fun BibleScreen(
                 }
                 verses.isEmpty() -> {
                     Text(
-                        if (prefs.bibleVersion.onlineAvailable) {
-                            "No text loaded. Check your connection, or try again."
-                        } else {
-                            "This chapter isn’t in the offline library yet. Try John 3, Psalm 23, or Genesis 1 — or journal from the reading plan."
-                        },
+                        "No text loaded. Connect to the internet for CSB/NLT, or try again offline for KJV samples.",
                         style = MaterialTheme.typography.bodyLarge
                     )
                 }
@@ -256,9 +260,10 @@ fun BibleScreen(
                                     style = MaterialTheme.typography.labelLarge,
                                     modifier = Modifier.padding(end = 8.dp)
                                 )
-                                Text(
-                                    verse.text,
+                                RedLetterVerseText(
+                                    verse = verse,
                                     style = MaterialTheme.typography.bodyLarge,
+                                    narratorColor = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.weight(1f)
                                 )
                                 IconButton(
