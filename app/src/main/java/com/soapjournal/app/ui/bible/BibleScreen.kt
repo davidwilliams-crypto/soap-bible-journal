@@ -186,13 +186,16 @@ fun BibleScreen(
                             DropdownMenuItem(
                                 text = {
                                     Text(
-                                        when {
-                                            version.onlineAvailable ->
-                                                "${version.displayName} (online)"
-                                            version.offlineAvailable ->
-                                                "${version.displayName} (offline)"
-                                            else ->
-                                                "${version.displayName} → CSB online"
+                                        buildString {
+                                            append(version.displayName)
+                                            when {
+                                                version.onlineAvailable && version.offlineAvailable ->
+                                                    append(" · online / offline")
+                                                version.onlineAvailable ->
+                                                    append(" · online")
+                                                version.offlineAvailable ->
+                                                    append(" · offline")
+                                            }
                                         }
                                     )
                                 },
@@ -208,13 +211,11 @@ fun BibleScreen(
 
             val statusLine = when {
                 usedOfflineFallback ->
-                    "Offline · showing KJV"
+                    "Offline · showing KJV samples"
                 prefs.bibleVersion.onlineAvailable ->
                     "${prefs.bibleVersion.displayName} · words of Jesus in red"
-                prefs.bibleVersion == BibleVersion.KJV ->
-                    "KJV offline · CSB when online"
                 else ->
-                    "Online reading uses CSB"
+                    "${prefs.bibleVersion.displayName}"
             }
             Text(
                 statusLine,

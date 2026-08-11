@@ -110,6 +110,7 @@ class BibleRepository(
     private fun resolveOnlineVersion(version: BibleVersion): BibleVersion =
         when {
             version.onlineAvailable -> version
+            // Should not happen once every enum has a slug; keep CSB as safe default.
             else -> BibleVersion.CSB
         }
 

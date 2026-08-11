@@ -341,7 +341,7 @@ fun SettingsScreen(
 
             SettingsSection("About") {
                 Text(
-                    "Preferred Bible version defaults to CSB online. NLT is available in Scripture. Offline fallback is public-domain KJV.",
+                    "Bible versions load online via the selected translation (CSB, ESV, NIV, NLT, MSG, NASB, AMP, KJV, NKJV). Offline fallback uses public-domain KJV samples.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
