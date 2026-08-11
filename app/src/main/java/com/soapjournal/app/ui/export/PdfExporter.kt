@@ -31,8 +31,9 @@ object PdfExporter {
         val doc = PdfDocument()
         val pageWidth = 612
         val pageHeight = 792
+        var pageNumber = 1
 
-        writeCoverPage(doc, entry, pageWidth, pageHeight)
+        writeCoverPage(doc, entry, pageWidth, pageHeight, pageNumber++)
 
         SoapSection.entries.forEach { section ->
             writeSectionPage(
@@ -41,7 +42,8 @@ object PdfExporter {
                 section = section,
                 ink = inkBySection[section] ?: InkDocument(),
                 pageWidth = pageWidth,
-                pageHeight = pageHeight
+                pageHeight = pageHeight,
+                pageNumber = pageNumber++
             )
         }
 
@@ -64,9 +66,10 @@ object PdfExporter {
         doc: PdfDocument,
         entry: SoapEntryEntity,
         pageWidth: Int,
-        pageHeight: Int
+        pageHeight: Int,
+        pageNumber: Int
     ) {
-        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create()
+        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
         val page = doc.startPage(pageInfo)
         val canvas = page.canvas
         canvas.drawColor("#F7F1E8".toColorInt())
@@ -128,9 +131,10 @@ object PdfExporter {
         section: SoapSection,
         ink: InkDocument,
         pageWidth: Int,
-        pageHeight: Int
+        pageHeight: Int,
+        pageNumber: Int
     ) {
-        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, 1).create()
+        val pageInfo = PdfDocument.PageInfo.Builder(pageWidth, pageHeight, pageNumber).create()
         val page = doc.startPage(pageInfo)
         val canvas = page.canvas
         canvas.drawColor("#F7F1E8".toColorInt())

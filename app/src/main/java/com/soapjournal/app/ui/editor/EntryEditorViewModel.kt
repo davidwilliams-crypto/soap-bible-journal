@@ -14,6 +14,7 @@ import com.soapjournal.app.ui.ink.InkTool
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 data class SectionInkState(
     val document: InkDocument = InkDocument(),
@@ -53,7 +54,10 @@ class EntryEditorViewModel(
     var prayerFollowThrough by mutableStateOf(false)
         private set
 
-    private var persistJob: Job? = null
+    private var metadataPersistJob: Job? = null
+    private var inkPersistJob: Job? = null
+    private var metadataDirty = false
+    private val dirtyInkSections = mutableSetOf<SoapSection>()
 
     init {
         viewModelScope.launch {
@@ -88,16 +92,19 @@ class EntryEditorViewModel(
 
     fun updateReference(value: String) {
         scriptureReference = value
+        metadataDirty = true
         scheduleMetadataSave()
     }
 
     fun updateScriptureText(value: String) {
         scriptureText = value
+        metadataDirty = true
         scheduleMetadataSave()
     }
 
     fun updateTags(value: String) {
         tags = value
+        metadataDirty = true
         scheduleMetadataSave()
     }
 
@@ -146,11 +153,15 @@ class EntryEditorViewModel(
 
     fun saveNow() {
         viewModelScope.launch {
-            persistMetadata(markSaved = true)
+            metadataPersistJob?.cancel()
+            inkPersistJob?.cancel()
+            dirtyInkSections.clear()
+            metadataDirty = false
             SoapSection.entries.forEach { section ->
                 val doc = sectionInk[section]?.document ?: InkDocument()
                 repository.saveInk(entryId, section, doc)
             }
+            persistMetadata(markSaved = true)
             entry = repository.getEntry(entryId)
             statusMessage = "Saved"
         }
@@ -187,22 +198,58 @@ class EntryEditorViewModel(
         }
     }
 
+    override fun onCleared() {
+        metadataPersistJob?.cancel()
+        inkPersistJob?.cancel()
+        // Flush pending edits so leaving within the debounce window does not drop work.
+        runBlocking {
+            flushPending(markSaved = dirtyInkSections.isNotEmpty())
+        }
+        super.onCleared()
+    }
+
     private fun scheduleMetadataSave() {
-        persistJob?.cancel()
-        persistJob = viewModelScope.launch {
+        metadataPersistJob?.cancel()
+        metadataPersistJob = viewModelScope.launch {
             delay(400)
             persistMetadata(markSaved = false)
+            metadataDirty = false
         }
     }
 
     private fun scheduleInkSave(section: SoapSection) {
-        persistJob?.cancel()
-        persistJob = viewModelScope.launch {
+        dirtyInkSections.add(section)
+        inkPersistJob?.cancel()
+        inkPersistJob = viewModelScope.launch {
             delay(350)
-            val doc = sectionInk[section]?.document ?: return@launch
+            flushInk(markSaved = true)
+        }
+    }
+
+    private suspend fun flushInk(markSaved: Boolean) {
+        val sections = dirtyInkSections.toList()
+        dirtyInkSections.clear()
+        sections.forEach { section ->
+            val doc = sectionInk[section]?.document ?: InkDocument()
             repository.saveInk(entryId, section, doc)
-            persistMetadata(markSaved = true)
+        }
+        if (sections.isNotEmpty() || metadataDirty) {
+            persistMetadata(markSaved = markSaved)
+            metadataDirty = false
             entry = repository.getEntry(entryId)
+        }
+    }
+
+    private suspend fun flushPending(markSaved: Boolean) {
+        val sections = dirtyInkSections.toList()
+        dirtyInkSections.clear()
+        sections.forEach { section ->
+            val doc = sectionInk[section]?.document ?: InkDocument()
+            repository.saveInk(entryId, section, doc)
+        }
+        if (metadataDirty || sections.isNotEmpty() || markSaved) {
+            persistMetadata(markSaved = markSaved)
+            metadataDirty = false
         }
     }
 

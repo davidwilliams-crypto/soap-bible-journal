@@ -75,7 +75,7 @@ fun ReadingPlanScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             Text("Today: ${today.label}", style = MaterialTheme.typography.titleLarge)
-            val passageText = container.bible.passageText(today.passage, prefs.bibleVersion)
+            val passageText = container.bible.passageText(today.passages, prefs.bibleVersion)
             if (passageText.isNotBlank()) {
                 Text(
                     passageText.take(500) + if (passageText.length > 500) "…" else "",

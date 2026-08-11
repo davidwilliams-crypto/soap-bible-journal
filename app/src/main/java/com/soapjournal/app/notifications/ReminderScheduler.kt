@@ -47,9 +47,17 @@ class ReminderScheduler(private val context: Context) {
         )
     }
 
-    fun cancelAll() {
+    fun cancelDaily() {
         WorkManager.getInstance(context).cancelUniqueWork(WORK_DAILY)
+    }
+
+    fun cancelFollowThrough() {
         WorkManager.getInstance(context).cancelUniqueWork(WORK_FOLLOW_THROUGH)
+    }
+
+    fun cancelAll() {
+        cancelDaily()
+        cancelFollowThrough()
     }
 
     private fun millisUntil(hour: Int, minute: Int): Long {

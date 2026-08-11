@@ -38,7 +38,7 @@ class HomeViewModel(
         viewModelScope.launch {
             val prefs = preferences.value
             val reading = todayReading(prefs)
-            val text = bible.passageText(reading.passage, prefs.bibleVersion)
+            val text = bible.passageText(reading.passages, prefs.bibleVersion)
             val entry = repository.getOrCreateTodayEntry(
                 scriptureReference = reading.label,
                 scriptureText = text,

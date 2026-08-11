@@ -31,11 +31,18 @@ class JournalRepository(
     ): SoapEntryEntity {
         val today = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
         dao.getForDate(today)?.let { existing ->
-            if (scriptureReference.isNotBlank() && existing.scriptureReference.isBlank()) {
+            // Callers that pass a passage (Bible / reading plan) should apply it even when
+            // today's entry already has a different or empty reference.
+            if (scriptureReference.isNotBlank() &&
+                (existing.scriptureReference.isBlank() ||
+                    existing.scriptureReference != scriptureReference ||
+                    existing.scriptureText != scriptureText ||
+                    (readingPlanDay != null && existing.readingPlanDay != readingPlanDay))
+            ) {
                 val updated = existing.copy(
                     scriptureReference = scriptureReference,
                     scriptureText = scriptureText,
-                    readingPlanDay = readingPlanDay,
+                    readingPlanDay = readingPlanDay ?: existing.readingPlanDay,
                     updatedAtEpochMs = System.currentTimeMillis()
                 )
                 dao.update(updated)
@@ -90,7 +97,7 @@ class JournalRepository(
             )
         )
         if (markSaved) {
-            prefs.recordDailyCompletion(LocalDate.ofEpochDay(existing.entryDateEpochDay))
+            maybeRecordCompletion(existing)
         }
     }
 
@@ -115,8 +122,17 @@ class JournalRepository(
     suspend fun saveInk(entryId: Long, section: SoapSection, document: InkDocument) {
         inkStore.save(entryId, section, document)
         val existing = dao.getById(entryId) ?: return
-        dao.update(existing.copy(updatedAtEpochMs = System.currentTimeMillis(), isDraft = false))
-        prefs.recordDailyCompletion(LocalDate.ofEpochDay(existing.entryDateEpochDay))
+        val hasContent = document.strokes.isNotEmpty()
+        dao.update(
+            existing.copy(
+                updatedAtEpochMs = System.currentTimeMillis(),
+                // Clearing ink should not flip a draft to completed.
+                isDraft = if (hasContent) false else existing.isDraft
+            )
+        )
+        if (hasContent) {
+            maybeRecordCompletion(existing)
+        }
     }
 
     suspend fun deleteEntry(entryId: Long) {
@@ -141,4 +157,12 @@ class JournalRepository(
     suspend fun deleteMemoryVerse(id: Long) = memoryDao.delete(id)
 
     suspend fun reviewMemoryVerse(id: Long) = memoryDao.markReviewed(id)
+
+    private suspend fun maybeRecordCompletion(entry: SoapEntryEntity) {
+        val today = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
+        // Editing past entries must not rewrite or reset today's streak.
+        if (entry.entryDateEpochDay == today) {
+            prefs.recordDailyCompletion(LocalDate.ofEpochDay(today))
+        }
+    }
 }

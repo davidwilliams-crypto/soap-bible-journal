@@ -23,6 +23,7 @@ class SoapJournalApplication : Application() {
         container = AppContainer(this)
         createNotificationChannels()
         appScope.launch {
+            container.prefs.ensurePlanStartInitialized()
             val prefs = container.prefs.preferences.first()
             if (prefs.remindersEnabled) {
                 container.reminders.scheduleDaily(prefs.reminderHour, prefs.reminderMinute)

@@ -12,9 +12,12 @@ object ReadingPlan {
 
     data class DayReading(
         val dayIndex: Int,
-        val passage: PassageRef,
-        val label: String = passage.display
-    )
+        val passages: List<PassageRef>,
+        val label: String
+    ) {
+        /** Primary passage for callers that only need a single ref (first book slice). */
+        val passage: PassageRef get() = passages.first()
+    }
 
     private val books: List<Pair<String, Int>> = listOf(
         "Genesis" to 50, "Exodus" to 40, "Leviticus" to 27, "Numbers" to 36, "Deuteronomy" to 34,
@@ -48,18 +51,35 @@ object ReadingPlan {
             val slice = allChapters.subList(start, endExclusive.coerceAtMost(totalChapters))
             val first = slice.first()
             val last = slice.last()
-            val passage = if (first.book == last.book) {
-                PassageRef(first.book, first.startChapter, last.endChapter)
-            } else {
-                PassageRef(first.book, first.startChapter, first.endChapter)
-            }
+            val passages = groupPassages(slice)
             val label = if (first.book == last.book) {
-                passage.display
+                passages.first().display
             } else {
                 "${first.book} ${first.startChapter} – ${last.book} ${last.endChapter}"
             }
-            DayReading(dayIndex = day, passage = passage, label = label)
+            DayReading(dayIndex = day, passages = passages, label = label)
         }
+    }
+
+    private fun groupPassages(slice: List<PassageRef>): List<PassageRef> {
+        if (slice.isEmpty()) return emptyList()
+        val grouped = mutableListOf<PassageRef>()
+        var book = slice.first().book
+        var startChapter = slice.first().startChapter
+        var endChapter = slice.first().endChapter
+        for (i in 1 until slice.size) {
+            val chapter = slice[i]
+            if (chapter.book == book) {
+                endChapter = chapter.endChapter
+            } else {
+                grouped += PassageRef(book, startChapter, endChapter)
+                book = chapter.book
+                startChapter = chapter.startChapter
+                endChapter = chapter.endChapter
+            }
+        }
+        grouped += PassageRef(book, startChapter, endChapter)
+        return grouped
     }
 
     fun dayFor(planStart: LocalDate, date: LocalDate = LocalDate.now()): DayReading {
