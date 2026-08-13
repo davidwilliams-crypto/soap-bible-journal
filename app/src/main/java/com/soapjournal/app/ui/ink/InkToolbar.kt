@@ -8,10 +8,10 @@ object InkDefaults {
     const val DefaultStrokeWidth = 4f
     const val MinStrokeWidth = 2f
     const val MaxStrokeWidth = 14f
-    /** Taller default page so Observation/Application/Prayer have room to write. */
-    const val MinCanvasHeightDp = 2200
-    /** Extra blank page when the user taps “Add writing space” (~900dp at xxhdpi). */
-    const val PageExtendPx = 2700f
+    /** One writing viewport; the page grows as ink reaches the bottom. */
+    const val MinCanvasHeightDp = 680
+    /** Extra paper when the user taps “Add writing space”. */
+    const val PageExtendPx = 1400f
     /** Keep this much blank paper below the lowest stroke while writing. */
-    const val AutoGrowPaddingPx = 520f
+    const val AutoGrowPaddingPx = 360f
 }

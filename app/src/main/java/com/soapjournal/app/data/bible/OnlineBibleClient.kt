@@ -4,6 +4,7 @@ import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import java.net.HttpURLConnection
 import java.net.URL
@@ -12,11 +13,11 @@ import java.net.URL
  * Fetches online Bible chapters via bolls.life (CSB, ESV, NIV, NLT, MSG, NASB, AMP, KJV, NKJV).
  * Offline KJV samples are handled by [BibleRepository] when the device has no network.
  */
-class OnlineBibleClient(
+open class OnlineBibleClient(
     private val gson: Gson = Gson(),
     private val baseUrl: String = "https://bolls.life"
 ) {
-    suspend fun fetchChapter(
+    open suspend fun fetchChapter(
         book: String,
         chapter: Int,
         version: BibleVersion
@@ -33,7 +34,9 @@ class OnlineBibleClient(
         }
         try {
             if (connection.responseCode !in 200..299) return@withContext emptyList()
+            ensureActive()
             val body = connection.inputStream.bufferedReader().use { it.readText() }
+            ensureActive()
             val type = object : TypeToken<List<RemoteVerse>>() {}.type
             val remote: List<RemoteVerse> = gson.fromJson(body, type) ?: emptyList()
             remote.mapNotNull { item ->

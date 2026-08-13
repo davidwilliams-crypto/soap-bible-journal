@@ -4,6 +4,7 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
@@ -22,8 +23,8 @@ fun RedLetterVerseText(
     narratorColor: Color = LocalContentColor.current
 ) {
     val christColor = LocalJournalSurfaces.current.jesusRed
-    Text(
-        text = buildAnnotatedString {
+    val annotated = remember(verse, christColor, narratorColor) {
+        buildAnnotatedString {
             verse.displaySpans().forEach { span ->
                 withStyle(
                     SpanStyle(
@@ -34,7 +35,10 @@ fun RedLetterVerseText(
                     append(span.text)
                 }
             }
-        },
+        }
+    }
+    Text(
+        text = annotated,
         modifier = modifier,
         style = style
     )

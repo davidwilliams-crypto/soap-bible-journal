@@ -12,6 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -19,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -35,11 +37,13 @@ import androidx.compose.ui.unit.dp
 import com.soapjournal.app.data.ink.InkDocument
 import com.soapjournal.app.data.ink.InkPoint
 import com.soapjournal.app.data.ink.InkStroke
+import com.soapjournal.app.data.ink.shouldKeepInkPoint
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 
 enum class InkTool {
     PEN,
-    ERASER
+    ERASER,
+    PAN
 }
 
 /**
@@ -69,7 +73,7 @@ fun InkCanvas(
     val paperColor = surfaces.paper
     val ruleColor = surfaces.rule
     var canvasWidth by remember { mutableFloatStateOf(document.canvasWidth) }
-    var activeStroke by remember { mutableStateOf<InkStroke?>(null) }
+    var viewportHeight by remember { mutableFloatStateOf(0f) }
     val currentDocument by rememberUpdatedState(document)
     val currentOnChange by rememberUpdatedState(onDocumentChange)
     val density = LocalDensity.current
@@ -81,21 +85,35 @@ fun InkCanvas(
     val blockScrollWhileDrawing = remember {
         object : NestedScrollConnection {
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // Consume scroll deltas while a stroke is active so Samsung S Pen
-                // writing is not stolen by the paper scroll container.
                 return if (scrollGate.drawing) available else Offset.Zero
             }
+        }
+    }
+
+    val livePoints = remember { mutableListOf<InkPoint>() }
+    var liveRevision by remember { mutableIntStateOf(0) }
+    var liveIsEraser by remember { mutableStateOf(false) }
+    var liveWidth by remember { mutableFloatStateOf(strokeWidth) }
+    var liveColorArgb by remember { mutableIntStateOf(resolvedInk.toArgb()) }
+
+    val pathCache = remember { LinkedHashMap<InkStroke, Path>() }
+    val committedPaths = remember(document.strokes) {
+        val keep = document.strokes.toHashSet()
+        pathCache.keys.retainAll(keep)
+        document.strokes.map { stroke ->
+            pathCache.getOrPut(stroke) { stroke.toPath() }
         }
     }
 
     Box(
         modifier = modifier
             .background(paperColor)
-            .nestedScroll(blockScrollWhileDrawing)
-            .verticalScroll(scrollState)
             .onSizeChanged { size ->
+                viewportHeight = size.height.toFloat()
                 canvasWidth = size.width.toFloat()
             }
+            .nestedScroll(blockScrollWhileDrawing)
+            .verticalScroll(scrollState)
     ) {
         Canvas(
             modifier = Modifier
@@ -103,7 +121,6 @@ fun InkCanvas(
                 .height(contentHeightDp)
                 .pointerInput(tool, strokeWidth, resolvedInk, stylusOnly) {
                     awaitEachGesture {
-                        // Initial pass so we win against scrollable / pager parents.
                         val down = awaitFirstDown(
                             requireUnconsumed = false,
                             pass = PointerEventPass.Initial
@@ -112,7 +129,6 @@ fun InkCanvas(
                         val isStylusLike = pointerType == PointerType.Stylus ||
                             pointerType == PointerType.Eraser ||
                             pointerType == PointerType.Mouse
-                        // Samsung One UI sometimes delivers S Pen as Touch.
                         val isTouch = pointerType == PointerType.Touch
                         if (stylusOnly && !isStylusLike) {
                             return@awaitEachGesture
@@ -120,25 +136,27 @@ fun InkCanvas(
                         if (!isStylusLike && !isTouch) {
                             return@awaitEachGesture
                         }
+                        // Pan with finger / touch so the paper can move; stylus still writes.
+                        if (tool == InkTool.PAN && !isStylusLike) {
+                            return@awaitEachGesture
+                        }
 
                         down.consume()
                         scrollGate.drawing = true
 
-                        val points = mutableListOf(
-                            InkPoint(
-                                x = down.position.x,
-                                y = down.position.y,
-                                pressure = down.pressure.takeIf { it > 0f }?.coerceIn(0.05f, 1f) ?: 1f,
-                                timestamp = System.currentTimeMillis()
-                            )
+                        val first = InkPoint(
+                            x = down.position.x,
+                            y = down.position.y,
+                            pressure = down.pressure.takeIf { it > 0f }?.coerceIn(0.05f, 1f) ?: 1f,
+                            timestamp = System.currentTimeMillis()
                         )
                         val isEraser = tool == InkTool.ERASER || pointerType == PointerType.Eraser
-                        activeStroke = InkStroke(
-                            points = points.toList(),
-                            colorArgb = resolvedInk.toArgb(),
-                            width = if (isEraser) strokeWidth * 3f else strokeWidth,
-                            isEraser = isEraser
-                        )
+                        livePoints.clear()
+                        livePoints += first
+                        liveIsEraser = isEraser
+                        liveWidth = if (isEraser) strokeWidth * 3f else strokeWidth
+                        liveColorArgb = resolvedInk.toArgb()
+                        liveRevision++
 
                         try {
                             while (true) {
@@ -148,14 +166,31 @@ fun InkCanvas(
                                 } ?: event.changes.firstOrNull() ?: break
 
                                 change.consume()
-                                points += InkPoint(
+                                val next = InkPoint(
                                     x = change.position.x,
                                     y = change.position.y,
                                     pressure = change.pressure.takeIf { it > 0f }
                                         ?.coerceIn(0.05f, 1f) ?: 1f,
                                     timestamp = System.currentTimeMillis()
                                 )
-                                activeStroke = activeStroke?.copy(points = points.toList())
+                                val prev = livePoints.lastOrNull()
+                                val keep = prev == null ||
+                                    !change.pressed ||
+                                    shouldKeepInkPoint(prev, next)
+                                if (keep) {
+                                    livePoints += next
+                                    liveRevision++
+                                }
+
+                                val viewH = viewportHeight
+                                if (viewH > 0f && change.position.y > scrollState.value + viewH - 160f) {
+                                    val dest = (change.position.y - viewH + 200f).toInt()
+                                        .coerceIn(0, scrollState.maxValue)
+                                    val delta = dest - scrollState.value
+                                    if (delta > 0) {
+                                        scrollState.dispatchRawDelta(delta.toFloat())
+                                    }
+                                }
 
                                 if (!change.pressed) break
                             }
@@ -163,21 +198,22 @@ fun InkCanvas(
                             scrollGate.drawing = false
                         }
 
-                        val finished = activeStroke
-                        activeStroke = null
-                        // Accept single-point taps as tiny strokes (stylus tip taps).
-                        if (finished != null && finished.points.isNotEmpty()) {
-                            val stroke = if (finished.points.size == 1) {
-                                val p = finished.points.first()
-                                finished.copy(
-                                    points = listOf(
-                                        p,
-                                        p.copy(x = p.x + 0.5f, y = p.y + 0.5f)
-                                    )
-                                )
+                        val finishedPoints = livePoints.toList()
+                        livePoints.clear()
+                        liveRevision = 0
+                        if (finishedPoints.isNotEmpty()) {
+                            val points = if (finishedPoints.size == 1) {
+                                val p = finishedPoints.first()
+                                listOf(p, p.copy(x = p.x + 0.5f, y = p.y + 0.5f))
                             } else {
-                                finished
+                                finishedPoints
                             }
+                            val stroke = InkStroke(
+                                points = points,
+                                colorArgb = liveColorArgb,
+                                width = liveWidth,
+                                isEraser = liveIsEraser
+                            )
                             val latest = currentDocument
                             val maxY = stroke.points.maxOf { it.y } + InkDefaults.AutoGrowPaddingPx
                             val newHeight = maxOf(latest.canvasHeight, maxY, minHeightPx)
@@ -193,6 +229,7 @@ fun InkCanvas(
                     }
                 }
         ) {
+            val revision = liveRevision
             val lineSpacing = 48.dp.toPx()
             var y = lineSpacing
             while (y < size.height) {
@@ -205,9 +242,8 @@ fun InkCanvas(
                 y += lineSpacing
             }
 
-            val strokesToDraw = activeStroke?.let { document.strokes + it } ?: document.strokes
-            strokesToDraw.forEach { stroke ->
-                val path = stroke.toPath()
+            committedPaths.forEachIndexed { index, path ->
+                val stroke = document.strokes[index]
                 drawPath(
                     path = path,
                     color = if (stroke.isEraser) paperColor else Color(stroke.colorArgb),
@@ -216,6 +252,31 @@ fun InkCanvas(
                         cap = StrokeCap.Round,
                         join = StrokeJoin.Round
                     )
+                )
+            }
+
+            if (revision > 0 && livePoints.size >= 2) {
+                val active = InkStroke(
+                    points = livePoints,
+                    colorArgb = liveColorArgb,
+                    width = liveWidth,
+                    isEraser = liveIsEraser
+                )
+                drawPath(
+                    path = active.toPath(),
+                    color = if (active.isEraser) paperColor else Color(active.colorArgb),
+                    style = Stroke(
+                        width = active.width,
+                        cap = StrokeCap.Round,
+                        join = StrokeJoin.Round
+                    )
+                )
+            } else if (revision > 0 && livePoints.size == 1) {
+                val p = livePoints.first()
+                drawCircle(
+                    color = if (liveIsEraser) paperColor else Color(liveColorArgb),
+                    radius = liveWidth / 2f,
+                    center = Offset(p.x, p.y)
                 )
             }
         }

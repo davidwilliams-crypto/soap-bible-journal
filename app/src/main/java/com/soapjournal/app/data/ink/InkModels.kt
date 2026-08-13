@@ -11,6 +11,17 @@ data class InkPoint(
     val timestamp: Long = 0L
 )
 
+/** Skip micro-samples so live ink and saved JSON stay lighter. */
+fun shouldKeepInkPoint(
+    previous: InkPoint,
+    next: InkPoint,
+    minDistance: Float = 1.4f
+): Boolean {
+    val dx = next.x - previous.x
+    val dy = next.y - previous.y
+    return dx * dx + dy * dy >= minDistance * minDistance
+}
+
 data class InkStroke(
     val points: List<InkPoint>,
     val colorArgb: Int = Color(0xFF2C2416).toArgb(),

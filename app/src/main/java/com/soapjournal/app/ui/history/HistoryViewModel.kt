@@ -9,6 +9,8 @@ import androidx.lifecycle.viewModelScope
 import com.soapjournal.app.data.JournalRepository
 import com.soapjournal.app.data.SoapEntryEntity
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
@@ -24,6 +26,7 @@ class HistoryViewModel(
         private set
 
     private val queryFlow = kotlinx.coroutines.flow.MutableStateFlow("")
+    private var searchJob: Job? = null
 
     val entries: StateFlow<List<SoapEntryEntity>> = queryFlow
         .flatMapLatest { repository.search(it) }
@@ -31,7 +34,11 @@ class HistoryViewModel(
 
     fun updateQuery(value: String) {
         query = value
-        queryFlow.value = value
+        searchJob?.cancel()
+        searchJob = viewModelScope.launch {
+            delay(180)
+            queryFlow.value = value
+        }
     }
 
     fun delete(entryId: Long) {

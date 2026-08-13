@@ -1,9 +1,11 @@
 package com.soapjournal.app.ui.bible
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,10 +13,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -23,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,10 +41,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -88,13 +96,13 @@ fun BibleScreen(
     var book by remember { mutableStateOf(vm.books.firstOrNull() ?: "John") }
     var chapter by remember { mutableIntStateOf(vm.chapters(book).firstOrNull() ?: 1) }
     var versionMenu by remember { mutableStateOf(false) }
-    var bookMenu by remember { mutableStateOf(false) }
-    var chapterMenu by remember { mutableStateOf(false) }
+    var bookPicker by remember { mutableStateOf(false) }
+    var chapterPicker by remember { mutableStateOf(false) }
     var verses by remember { mutableStateOf<List<BibleVerse>>(emptyList()) }
     var loading by remember { mutableStateOf(false) }
     var usedOfflineFallback by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
     val surfaces = LocalJournalSurfaces.current
+    val context = LocalContext.current
 
     LaunchedEffect(book, chapter, prefs.bibleVersion) {
         loading = true
@@ -104,6 +112,30 @@ fun BibleScreen(
             loaded.first().version == BibleVersion.KJV &&
             prefs.bibleVersion != BibleVersion.KJV
         loading = false
+    }
+
+    if (bookPicker) {
+        BookPickerDialog(
+            books = vm.books,
+            selected = book,
+            onSelect = { chosen ->
+                book = chosen
+                chapter = vm.chapters(chosen).firstOrNull() ?: 1
+                bookPicker = false
+            },
+            onDismiss = { bookPicker = false }
+        )
+    }
+    if (chapterPicker) {
+        ChapterPickerDialog(
+            chapters = vm.chapters(book),
+            selected = chapter,
+            onSelect = {
+                chapter = it
+                chapterPicker = false
+            },
+            onDismiss = { chapterPicker = false }
+        )
     }
 
     Scaffold(
@@ -141,38 +173,8 @@ fun BibleScreen(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box {
-                    TextButton(onClick = { bookMenu = true }) { Text(book) }
-                    DropdownMenu(expanded = bookMenu, onDismissRequest = { bookMenu = false }) {
-                        vm.books.forEach { b ->
-                            DropdownMenuItem(
-                                text = { Text(b) },
-                                onClick = {
-                                    book = b
-                                    chapter = vm.chapters(b).firstOrNull() ?: 1
-                                    bookMenu = false
-                                }
-                            )
-                        }
-                    }
-                }
-                Box {
-                    TextButton(onClick = { chapterMenu = true }) { Text("Ch $chapter") }
-                    DropdownMenu(
-                        expanded = chapterMenu,
-                        onDismissRequest = { chapterMenu = false }
-                    ) {
-                        vm.chapters(book).forEach { c ->
-                            DropdownMenuItem(
-                                text = { Text(c.toString()) },
-                                onClick = {
-                                    chapter = c
-                                    chapterMenu = false
-                                }
-                            )
-                        }
-                    }
-                }
+                TextButton(onClick = { bookPicker = true }) { Text(book) }
+                TextButton(onClick = { chapterPicker = true }) { Text("Ch $chapter") }
                 Spacer(modifier = Modifier.weight(1f))
                 Box {
                     TextButton(onClick = { versionMenu = true }) {
@@ -225,7 +227,7 @@ fun BibleScreen(
             )
 
             when {
-                loading -> {
+                verses.isEmpty() && loading -> {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -255,56 +257,166 @@ fun BibleScreen(
                         Text("Journal this chapter (SOAP)")
                     }
 
-                    LazyColumn(
+                    Box(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .background(surfaces.paper)
-                            .padding(horizontal = 20.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        item { Spacer(modifier = Modifier.height(8.dp)) }
-                        items(verses, key = { it.reference }) { verse ->
-                            Row(verticalAlignment = Alignment.Top) {
-                                Text(
-                                    "${verse.verse}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.secondary,
-                                    modifier = Modifier.padding(end = 10.dp, top = 4.dp)
-                                )
-                                RedLetterVerseText(
-                                    verse = verse,
-                                    style = MaterialTheme.typography.bodyLarge,
-                                    narratorColor = MaterialTheme.colorScheme.onBackground,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                IconButton(
-                                    onClick = {
-                                        scope.launch {
+                        LazyColumn(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(surfaces.paper)
+                                .padding(horizontal = 20.dp)
+                                .alpha(if (loading) 0.45f else 1f),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            item { Spacer(modifier = Modifier.height(8.dp)) }
+                            items(verses, key = { it.reference }) { verse ->
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Text(
+                                        "${verse.verse}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.secondary,
+                                        modifier = Modifier.padding(end = 10.dp, top = 4.dp)
+                                    )
+                                    RedLetterVerseText(
+                                        verse = verse,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        narratorColor = MaterialTheme.colorScheme.onBackground,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(
+                                        onClick = {
                                             vm.addToMemory(verse.reference, verse.text)
+                                            Toast.makeText(
+                                                context,
+                                                "Saved ${verse.reference}",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                         }
+                                    ) {
+                                        Icon(
+                                            Icons.Outlined.Psychology,
+                                            contentDescription = "Memorize"
+                                        )
                                     }
-                                ) {
-                                    Icon(
-                                        Icons.Outlined.Psychology,
-                                        contentDescription = "Memorize"
+                                }
+                            }
+                            prefs.bibleVersion.copyrightNotice?.let { notice ->
+                                item {
+                                    Text(
+                                        notice,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(top = 12.dp, bottom = 28.dp)
                                     )
                                 }
                             }
                         }
-                        prefs.bibleVersion.copyrightNotice?.let { notice ->
-                            item {
-                                Text(
-                                    notice,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.padding(top = 12.dp, bottom = 28.dp)
-                                )
-                            }
+                        if (loading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.align(Alignment.TopCenter).padding(top = 24.dp)
+                            )
                         }
                     }
                 }
             }
         }
     }
+}
+
+@Composable
+private fun BookPickerDialog(
+    books: List<String>,
+    selected: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(query, books) {
+        val needle = query.trim()
+        if (needle.isEmpty()) books
+        else books.filter { it.contains(needle, ignoreCase = true) }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose a book") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Search") }
+                )
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(360.dp)
+                        .padding(top = 8.dp)
+                ) {
+                    items(filtered, key = { it }) { name ->
+                        TextButton(
+                            onClick = { onSelect(name) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                name,
+                                modifier = Modifier.fillMaxWidth(),
+                                color = if (name == selected) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
+}
+
+@Composable
+private fun ChapterPickerDialog(
+    chapters: List<Int>,
+    selected: Int,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Chapter") },
+        text = {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 52.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(360.dp),
+                contentPadding = PaddingValues(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                items(chapters, key = { it }) { number ->
+                    TextButton(onClick = { onSelect(number) }) {
+                        Text(
+                            number.toString(),
+                            color = if (number == selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Close") }
+        }
+    )
 }
