@@ -1,5 +1,6 @@
 package com.soapjournal.app.ui.navigation
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -21,9 +22,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.soapjournal.app.AppContainer
@@ -79,7 +82,7 @@ fun SoapNavHost(container: AppContainer) {
     } else {
         SoapNavGraph(
             container = container,
-            startDestination = start,
+            resumeDestination = start,
             prefsSnapshot = prefsSnapshot,
             scope = scope
         )
@@ -89,12 +92,19 @@ fun SoapNavHost(container: AppContainer) {
 @Composable
 private fun SoapNavGraph(
     container: AppContainer,
-    startDestination: String,
+    resumeDestination: String,
     prefsSnapshot: UserPreferences,
     scope: CoroutineScope
 ) {
+    // Editor can be the graph root so writing restores without a home flash.
+    // Every other screen starts at home so Back always has somewhere to go.
+    val graphStart = if (resumeDestination.startsWith("editor/")) {
+        resumeDestination
+    } else {
+        Routes.HOME
+    }
     val navController = rememberNavController()
-    var trackedRoute by rememberSaveable { mutableStateOf(startDestination) }
+    var trackedRoute by rememberSaveable { mutableStateOf(resumeDestination) }
 
     DisposableEffect(navController) {
         val listener =
@@ -122,9 +132,26 @@ private fun SoapNavGraph(
         onDispose { navController.removeOnDestinationChangedListener(listener) }
     }
 
+    LaunchedEffect(resumeDestination) {
+        if (graphStart == Routes.HOME && resumeDestination != Routes.HOME) {
+            navController.navigate(resumeDestination) {
+                launchSingleTop = true
+            }
+        }
+    }
+
+    val currentEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = currentEntry?.destination?.route
+    val stuckOnInnerRoot = currentRoute != null &&
+        currentRoute != Routes.HOME &&
+        navController.previousBackStackEntry == null
+    BackHandler(enabled = stuckOnInnerRoot) {
+        navController.popOrHome()
+    }
+
     NavHost(
         navController = navController,
-        startDestination = startDestination,
+        startDestination = graphStart,
         enterTransition = { enter },
         exitTransition = { exit },
         popEnterTransition = { popEnter },
@@ -155,7 +182,7 @@ private fun SoapNavGraph(
             )
             HistoryScreen(
                 viewModel = vm,
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popOrHome() },
                 onOpenEntry = { id -> navController.navigate(Routes.editor(id)) }
             )
         }
@@ -185,23 +212,14 @@ private fun SoapNavGraph(
             }
             EntryEditorScreen(
                 viewModel = vm,
-                onBack = {
-                    if (!navController.popBackStack()) {
-                        navController.navigate(Routes.HOME) {
-                            popUpTo(navController.graph.id) {
-                                inclusive = true
-                            }
-                            launchSingleTop = true
-                        }
-                    }
-                }
+                onBack = { navController.popOrHome() }
             )
         }
 
         composable(Routes.BIBLE) {
             BibleScreen(
                 container = container,
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popOrHome() },
                 onJournalPassage = { reference, text ->
                     scope.launch {
                         val entry = container.repository.getOrCreateTodayEntry(
@@ -217,7 +235,7 @@ private fun SoapNavGraph(
         composable(Routes.PLAN) {
             ReadingPlanScreen(
                 container = container,
-                onBack = { navController.popBackStack() },
+                onBack = { navController.popOrHome() },
                 onOpenEntry = { id -> navController.navigate(Routes.editor(id)) }
             )
         }
@@ -225,20 +243,33 @@ private fun SoapNavGraph(
         composable(Routes.MEMORY) {
             MemoryScreen(
                 container = container,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popOrHome() }
             )
         }
 
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 container = container,
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popOrHome() }
             )
         }
     }
 }
 
-private fun resolveStartDestination(prefs: UserPreferences): String {
+internal fun NavController.popOrHome() {
+    if (!popBackStack()) {
+        navigate(Routes.HOME) {
+            popUpTo(graph.id) { inclusive = true }
+            launchSingleTop = true
+        }
+    }
+}
+
+/**
+ * Cold-start route after process death / app switch.
+ * Settings is never a start destination — Back would have nowhere to pop.
+ */
+internal fun resolveStartDestination(prefs: UserPreferences): String {
     return when {
         prefs.resumeRoute == "editor" && prefs.resumeEntryId > 0L ->
             Routes.editor(prefs.resumeEntryId)
@@ -246,7 +277,6 @@ private fun resolveStartDestination(prefs: UserPreferences): String {
         prefs.resumeRoute == "bible" -> Routes.BIBLE
         prefs.resumeRoute == "plan" -> Routes.PLAN
         prefs.resumeRoute == "memory" -> Routes.MEMORY
-        prefs.resumeRoute == "settings" -> Routes.SETTINGS
         else -> Routes.HOME
     }
 }
