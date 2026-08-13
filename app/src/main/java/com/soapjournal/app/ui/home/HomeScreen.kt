@@ -1,5 +1,6 @@
 package com.soapjournal.app.ui.home
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,6 +59,7 @@ fun HomeScreen(
     val today = LocalDate.now(ZoneId.systemDefault())
     val todayEntry = entries.firstOrNull { it.entryDateEpochDay == today.toEpochDay() }
     val reading = viewModel.todayReading(prefs)
+    val context = LocalContext.current
 
     JournalAtmosphere {
         Column(
@@ -192,10 +195,27 @@ fun HomeScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             TextButton(
-                                onClick = viewModel::addVotdToMemory,
+                                onClick = {
+                                    if (todayVerse.verse.text.startsWith("Unable to load")) {
+                                        viewModel.refreshVerseOfTheDay(force = true)
+                                    } else {
+                                        viewModel.addVotdToMemory()
+                                        Toast.makeText(
+                                            context,
+                                            "Saved for memorization",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                },
                                 modifier = Modifier.padding(top = 4.dp)
                             ) {
-                                Text("Save for memorization")
+                                Text(
+                                    if (todayVerse.verse.text.startsWith("Unable to load")) {
+                                        "Try again"
+                                    } else {
+                                        "Save for memorization"
+                                    }
+                                )
                             }
                         }
                     }

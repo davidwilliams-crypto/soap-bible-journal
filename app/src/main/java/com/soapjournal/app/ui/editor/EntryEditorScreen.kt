@@ -2,13 +2,13 @@ package com.soapjournal.app.ui.editor
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Fullscreen
 import androidx.compose.material.icons.outlined.FullscreenExit
 import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.PanTool
 import androidx.compose.material.icons.outlined.PostAdd
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Save
@@ -259,7 +260,8 @@ fun EntryEditorScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-                userScrollEnabled = false
+                userScrollEnabled = false,
+                beyondViewportPageCount = 0
             ) { page ->
                 val section = sections[page]
                 when (section) {
@@ -304,12 +306,12 @@ private fun ScripturePane(viewModel: EntryEditorViewModel) {
         OutlinedTextField(
             value = viewModel.scriptureText,
             onValueChange = viewModel::updateScriptureText,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(220.dp),
+            modifier = Modifier.fillMaxWidth(),
             label = { Text("Passage") },
             placeholder = { Text("Paste or type the passage") },
-            textStyle = MaterialTheme.typography.bodyLarge
+            textStyle = MaterialTheme.typography.bodyLarge,
+            minLines = 8,
+            maxLines = 16
         )
         OutlinedTextField(
             value = viewModel.tags,
@@ -367,6 +369,7 @@ private fun InkPane(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -382,7 +385,13 @@ private fun InkPane(
                 onClick = { viewModel.chooseTool(InkTool.ERASER) },
                 label = { Text("Eraser") }
             )
-            Spacer(modifier = Modifier.weight(1f))
+            FilterChip(
+                selected = viewModel.tool == InkTool.PAN,
+                onClick = { viewModel.chooseTool(InkTool.PAN) },
+                label = { Text("Move") },
+                leadingIcon = { Icon(Icons.Outlined.PanTool, contentDescription = null) }
+            )
+            Spacer(modifier = Modifier.width(8.dp))
             IconButton(onClick = { viewModel.extendCanvas(section) }) {
                 Icon(Icons.Outlined.PostAdd, contentDescription = "Add writing space")
             }
@@ -453,15 +462,6 @@ private fun InkPane(
                 }
             }
         }
-
-        TextButton(
-            onClick = { viewModel.extendCanvas(section) },
-            modifier = Modifier.padding(horizontal = 12.dp)
-        ) {
-            Text("Add writing space")
-        }
-
-        Spacer(modifier = Modifier.height(2.dp))
 
         InkCanvas(
             document = state.document,

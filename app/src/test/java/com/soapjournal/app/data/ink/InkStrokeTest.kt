@@ -2,6 +2,7 @@ package com.soapjournal.app.data.ink
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class InkStrokeTest {
@@ -18,6 +19,13 @@ class InkStrokeTest {
         assertEquals(3, stroke.points.size)
         assertEquals(6f, stroke.width)
         assertFalse(stroke.isEraser)
+    }
+
+    @Test
+    fun thinsMicroscopicInkSamples() {
+        val origin = InkPoint(0f, 0f)
+        assertFalse(shouldKeepInkPoint(origin, InkPoint(0.4f, 0.4f)))
+        assertTrue(shouldKeepInkPoint(origin, InkPoint(3f, 0f)))
     }
 
     @Test

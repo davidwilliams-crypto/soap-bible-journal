@@ -210,4 +210,33 @@ class BibleRepositoryTest {
     fun johnThreeSixteenIsRedLetter() {
         assertEquals(RedLetterIndex.Kind.FULL, RedLetterIndex.kind("John", 3, 16))
     }
+
+    @Test
+    fun chapterCacheAvoidsRepeatOnlineFetches() = runBlocking {
+        val client = object : OnlineBibleClient() {
+            var fetches = 0
+            override suspend fun fetchChapter(
+                book: String,
+                chapter: Int,
+                version: BibleVersion
+            ): List<BibleVerse> {
+                fetches++
+                return listOf(
+                    BibleVerse(
+                        book = "John",
+                        chapter = chapter,
+                        verse = 1,
+                        text = "In the beginning",
+                        version = version
+                    )
+                )
+            }
+        }
+        val repo = BibleRepository(onlineClient = client, isOnline = { true })
+        repo.chapter("John", 3, BibleVersion.CSB)
+        repo.chapter("John", 3, BibleVersion.CSB)
+        assertEquals(1, client.fetches)
+        repo.chapter("John", 4, BibleVersion.CSB)
+        assertEquals(2, client.fetches)
+    }
 }

@@ -15,10 +15,12 @@ import com.soapjournal.app.data.SoapSection
 import com.soapjournal.app.data.ink.InkDocument
 import com.soapjournal.app.ui.ink.InkDefaults
 import com.soapjournal.app.ui.ink.InkTool
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 
 data class SectionInkState(
     val document: InkDocument = InkDocument(),
@@ -131,7 +133,7 @@ class EntryEditorViewModel(
         val current = sectionInk[section] ?: SectionInkState()
         sectionInk = sectionInk + (section to current.copy(
             document = document,
-            undoStack = (current.undoStack + current.document).takeLast(40),
+            undoStack = (current.undoStack + current.document).takeLast(20),
             redoStack = emptyList()
         ))
         scheduleInkSave(section)
@@ -143,7 +145,6 @@ class EntryEditorViewModel(
             canvasHeight = current.document.canvasHeight + InkDefaults.PageExtendPx
         )
         onInkChanged(section, taller)
-        statusMessage = "Added writing space"
     }
 
     fun undo(section: SoapSection) {
@@ -173,7 +174,7 @@ class EntryEditorViewModel(
         val empty = InkDocument(canvasHeight = current.document.canvasHeight)
         sectionInk = sectionInk + (section to current.copy(
             document = empty,
-            undoStack = (current.undoStack + current.document).takeLast(40),
+            undoStack = (current.undoStack + current.document).takeLast(20),
             redoStack = emptyList()
         ))
         scheduleInkSave(section)
@@ -200,7 +201,9 @@ class EntryEditorViewModel(
         metadataPersistJob?.cancel()
         inkPersistJob?.cancel()
         runBlocking {
-            flushPending(markSaved = false)
+            withContext(Dispatchers.IO) {
+                flushPending(markSaved = false)
+            }
         }
     }
 
@@ -239,10 +242,12 @@ class EntryEditorViewModel(
         metadataPersistJob?.cancel()
         inkPersistJob?.cancel()
         runBlocking {
-            val inkHasContent = dirtyInkSections.any { section ->
-                sectionInk[section]?.document?.strokes?.isNotEmpty() == true
+            withContext(Dispatchers.IO) {
+                val inkHasContent = dirtyInkSections.any { section ->
+                    sectionInk[section]?.document?.strokes?.isNotEmpty() == true
+                }
+                flushPending(markSaved = inkHasContent)
             }
-            flushPending(markSaved = inkHasContent)
         }
         super.onCleared()
     }
@@ -260,7 +265,7 @@ class EntryEditorViewModel(
         dirtyInkSections.add(section)
         inkPersistJob?.cancel()
         inkPersistJob = viewModelScope.launch {
-            delay(350)
+            delay(550)
             flushInk()
         }
     }

@@ -13,6 +13,12 @@ class BibleRepository(
     private val byReference: Map<String, BibleVerse> =
         KjvCorpus.verses.associateBy { normalizeRef(it.reference) }
 
+    private val chapterCache = object : LinkedHashMap<String, List<BibleVerse>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, List<BibleVerse>>?): Boolean =
+            size > 24
+    }
+    private val cacheLock = Any()
+
     fun books(): List<String> = BibleCanon.books.map { it.name }
 
     fun chaptersFor(book: String): List<Int> = BibleCanon.chaptersFor(book)
@@ -29,14 +35,23 @@ class BibleRepository(
      * - Offline: public-domain KJV samples only.
      */
     suspend fun chapter(book: String, chapter: Int, version: BibleVersion): List<BibleVerse> {
-        if (isOnline()) {
-            val onlineVersion = resolveOnlineVersion(version)
-            val online = runCatching {
-                onlineClient.fetchChapter(book, chapter, onlineVersion)
+        val online = isOnline()
+        val resolved = if (online) resolveOnlineVersion(version) else BibleVersion.KJV
+        val key = cacheKey(book, chapter, resolved, online)
+        synchronized(cacheLock) { chapterCache[key] }?.let { return it }
+
+        val loaded = if (online) {
+            val remote = runCatching {
+                onlineClient.fetchChapter(book, chapter, resolved)
             }.getOrDefault(emptyList())
-            return WordsOfChristMarker.markChapter(online)
+            WordsOfChristMarker.markChapter(remote)
+        } else {
+            chapterOffline(book, chapter)
         }
-        return chapterOffline(book, chapter)
+        if (loaded.isNotEmpty()) {
+            synchronized(cacheLock) { chapterCache[key] = loaded }
+        }
+        return loaded
     }
 
     fun lookup(reference: String): BibleVerse? = byReference[normalizeRef(reference)]?.let {
@@ -75,21 +90,17 @@ class BibleRepository(
         val ref = votdRefFor(date)
         if (isOnline()) {
             val onlineVersion = resolveOnlineVersion(preferredVersion)
-            val onlineVerse = runCatching {
-                onlineClient.fetchChapter(ref.book, ref.chapter, onlineVersion)
-                    .firstOrNull { it.verse == ref.verse }
-            }.getOrNull()
+            val onlineVerse = chapter(ref.book, ref.chapter, onlineVersion)
+                .firstOrNull { it.verse == ref.verse }
             if (onlineVerse != null) {
-                val marked = WordsOfChristMarker.markChapter(listOf(onlineVerse)).first()
-                return VerseOfTheDay(marked, date.toEpochDay(), fromOfflineFallback = false)
+                return VerseOfTheDay(onlineVerse, date.toEpochDay(), fromOfflineFallback = false)
             }
-            // Online but fetch failed: do not silently switch to KJV.
             return VerseOfTheDay(
                 verse = BibleVerse(
                     book = ref.book,
                     chapter = ref.chapter,
                     verse = ref.verse,
-                    text = "Unable to load ${onlineVersion.displayName} right now. Pull to refresh when connected.",
+                    text = "Unable to load ${onlineVersion.displayName} right now. Tap Try again when connected.",
                     version = onlineVersion
                 ),
                 dateEpochDay = date.toEpochDay(),
@@ -110,9 +121,15 @@ class BibleRepository(
     private fun resolveOnlineVersion(version: BibleVersion): BibleVersion =
         when {
             version.onlineAvailable -> version
-            // Should not happen once every enum has a slug; keep CSB as safe default.
             else -> BibleVersion.CSB
         }
+
+    private fun cacheKey(
+        book: String,
+        chapter: Int,
+        version: BibleVersion,
+        online: Boolean
+    ): String = "${book.lowercase()}|$chapter|${version.name}|$online"
 
     private fun normalizeRef(ref: String): String =
         ref.trim()

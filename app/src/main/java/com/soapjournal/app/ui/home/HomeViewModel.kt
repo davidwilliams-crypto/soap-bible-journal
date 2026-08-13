@@ -13,6 +13,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -38,15 +40,29 @@ class HomeViewModel(
 
     init {
         viewModelScope.launch {
-            preferences.collectLatest { prefs ->
-                refreshVerseOfTheDay(prefs.bibleVersion)
-            }
+            preferences
+                .map { it.bibleVersion }
+                .distinctUntilChanged()
+                .collectLatest { version ->
+                    refreshVerseOfTheDay(version)
+                }
         }
     }
 
-    fun refreshVerseOfTheDay(preferredVersion: BibleVersion = preferences.value.bibleVersion) {
+    fun refreshVerseOfTheDay(
+        preferredVersion: BibleVersion = preferences.value.bibleVersion,
+        force: Boolean = false
+    ) {
         viewModelScope.launch {
-            _votdLoading.value = true
+            val today = LocalDate.now().toEpochDay()
+            val existing = _verseOfTheDay.value
+            val alreadyGood = existing != null &&
+                existing.dateEpochDay == today &&
+                existing.verse.version == preferredVersion &&
+                existing.verse.text.isNotBlank() &&
+                !existing.verse.text.startsWith("Unable to load")
+            if (alreadyGood && !force) return@launch
+            _votdLoading.value = existing == null
             _verseOfTheDay.value = bible.verseOfTheDay(
                 date = LocalDate.now(),
                 preferredVersion = preferredVersion

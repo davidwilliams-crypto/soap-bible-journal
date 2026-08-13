@@ -54,10 +54,13 @@ fun ReadingPlanScreen(
     val upcoming = ((today.dayIndex)..(today.dayIndex + 13).coerceAtMost(ReadingPlan.TOTAL_DAYS - 1))
         .map { ReadingPlan.day(it) }
     var passageText by remember(today.dayIndex, prefs.bibleVersion) { mutableStateOf("") }
+    var passageLoading by remember { mutableStateOf(true) }
     var confirmRestart by remember { mutableStateOf(false) }
 
     LaunchedEffect(today.dayIndex, prefs.bibleVersion, prefs.planStartEpochDay) {
+        passageLoading = true
         passageText = container.bible.passageText(today.passages, prefs.bibleVersion)
+        passageLoading = false
     }
 
     if (confirmRestart) {
@@ -108,17 +111,27 @@ fun ReadingPlanScreen(
                 modifier = Modifier.fillMaxWidth()
             )
             Text(today.label, style = MaterialTheme.typography.headlineSmall)
-            if (passageText.isNotBlank()) {
-                Text(
-                    passageText.take(500) + if (passageText.length > 500) "…" else "",
-                    style = MaterialTheme.typography.bodyLarge
-                )
-            } else {
-                Text(
-                    "Loading ${prefs.bibleVersion.displayName}… Offline uses KJV samples when available.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            when {
+                passageLoading -> {
+                    Text(
+                        "Loading ${prefs.bibleVersion.displayName}…",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                passageText.isNotBlank() -> {
+                    Text(
+                        passageText.take(500) + if (passageText.length > 500) "…" else "",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                }
+                else -> {
+                    Text(
+                        "No preview for this passage offline. Journal it to load the full text when connected.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
             Button(
                 onClick = {
@@ -148,7 +161,10 @@ fun ReadingPlanScreen(
                 color = MaterialTheme.colorScheme.secondary,
                 modifier = Modifier.padding(top = 8.dp)
             )
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
                 items(upcoming, key = { it.dayIndex }) { day ->
                     Column {
                         Text(

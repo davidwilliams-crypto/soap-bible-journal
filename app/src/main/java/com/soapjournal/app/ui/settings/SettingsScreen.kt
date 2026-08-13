@@ -1,7 +1,6 @@
 package com.soapjournal.app.ui.settings
 
 import android.Manifest
-import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.widget.Toast
@@ -33,6 +32,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -80,6 +80,15 @@ fun SettingsScreen(
     var confirmRestoreFromFolder by remember { mutableStateOf(false) }
     var pendingRestoreUri by remember { mutableStateOf<Uri?>(null) }
     var signatureMismatchUpdate by remember { mutableStateOf<AvailableUpdate?>(null) }
+    var reminderHour by remember { mutableFloatStateOf(prefs.reminderHour.toFloat()) }
+    var followThroughHour by remember { mutableFloatStateOf(prefs.followThroughHour.toFloat()) }
+
+    LaunchedEffect(prefs.reminderHour) {
+        reminderHour = prefs.reminderHour.toFloat()
+    }
+    LaunchedEffect(prefs.followThroughHour) {
+        followThroughHour = prefs.followThroughHour.toFloat()
+    }
 
     val chooseDriveFolder = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -244,14 +253,16 @@ fun SettingsScreen(
                         }
                     )
                 }
-                Text("Reminder hour: ${prefs.reminderHour}:00")
+                Text("Reminder hour: ${reminderHour.toInt()}:00")
                 Slider(
-                    value = prefs.reminderHour.toFloat(),
-                    onValueChange = { hour ->
+                    value = reminderHour,
+                    onValueChange = { reminderHour = it },
+                    onValueChangeFinished = {
                         scope.launch {
-                            container.prefs.setReminderTime(hour.toInt(), 0)
+                            val hour = reminderHour.toInt()
+                            container.prefs.setReminderTime(hour, 0)
                             if (prefs.remindersEnabled) {
-                                container.reminders.scheduleDaily(hour.toInt(), 0)
+                                container.reminders.scheduleDaily(hour, 0)
                             }
                         }
                     },
@@ -290,14 +301,16 @@ fun SettingsScreen(
                         }
                     )
                 }
-                Text("Follow-through hour: ${prefs.followThroughHour}:00")
+                Text("Follow-through hour: ${followThroughHour.toInt()}:00")
                 Slider(
-                    value = prefs.followThroughHour.toFloat(),
-                    onValueChange = { hour ->
+                    value = followThroughHour,
+                    onValueChange = { followThroughHour = it },
+                    onValueChangeFinished = {
                         scope.launch {
-                            container.prefs.setFollowThroughHour(hour.toInt())
+                            val hour = followThroughHour.toInt()
+                            container.prefs.setFollowThroughHour(hour)
                             if (prefs.followThroughEnabled) {
-                                container.reminders.scheduleFollowThrough(hour.toInt())
+                                container.reminders.scheduleFollowThrough(hour)
                             }
                         }
                     },
