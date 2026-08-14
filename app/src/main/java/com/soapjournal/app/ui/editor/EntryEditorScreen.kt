@@ -63,6 +63,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.soapjournal.app.data.SoapSection
 import com.soapjournal.app.ui.components.ConfirmActionDialog
+import com.soapjournal.app.ui.components.MilestoneCelebrationDialog
 import com.soapjournal.app.ui.export.PdfExporter
 import com.soapjournal.app.ui.ink.InkCanvas
 import com.soapjournal.app.ui.ink.InkTool
@@ -116,6 +117,10 @@ fun EntryEditorScreen(
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
             viewModel.consumeStatus()
         }
+    }
+
+    viewModel.celebrationMilestone?.let { days ->
+        MilestoneCelebrationDialog(days = days, onDismiss = { viewModel.dismissCelebration() })
     }
 
     Scaffold(

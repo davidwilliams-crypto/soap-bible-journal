@@ -168,3 +168,27 @@ fun ConfirmActionDialog(
         }
     )
 }
+
+/** Celebrates reaching a streak milestone (7/30/100/365 days). */
+@Composable
+fun MilestoneCelebrationDialog(days: Int, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text("$days days in the Word", style = MaterialTheme.typography.titleLarge)
+        },
+        text = {
+            Text(
+                "You've kept a $days-day SOAP rhythm. “Let us not grow weary of doing good, " +
+                    "for in due season we will reap, if we do not give up.” — Galatians 6:9",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Keep going", color = MaterialTheme.colorScheme.primary)
+            }
+        }
+    )
+}

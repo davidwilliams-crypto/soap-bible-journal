@@ -38,6 +38,8 @@ import com.soapjournal.app.ui.history.HistoryScreen
 import com.soapjournal.app.ui.history.HistoryViewModel
 import com.soapjournal.app.ui.home.HomeScreen
 import com.soapjournal.app.ui.home.HomeViewModel
+import com.soapjournal.app.ui.insights.InsightsScreen
+import com.soapjournal.app.ui.insights.InsightsViewModel
 import com.soapjournal.app.ui.memory.MemoryScreen
 import com.soapjournal.app.ui.plan.ReadingPlanScreen
 import com.soapjournal.app.ui.settings.SettingsScreen
@@ -52,6 +54,7 @@ object Routes {
     const val BIBLE = "bible"
     const val PLAN = "plan"
     const val MEMORY = "memory"
+    const val INSIGHTS = "insights"
     const val SETTINGS = "settings"
 
     fun editor(entryId: Long) = "editor/$entryId"
@@ -169,6 +172,7 @@ private fun SoapNavGraph(
                 onOpenBible = { navController.navigate(Routes.BIBLE) },
                 onOpenPlan = { navController.navigate(Routes.PLAN) },
                 onOpenMemory = { navController.navigate(Routes.MEMORY) },
+                onOpenInsights = { navController.navigate(Routes.INSIGHTS) },
                 onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 resumeEntryId = livePrefs.resumeEntryId.takeIf {
                     livePrefs.resumeRoute == "editor" && it > 0L
@@ -247,6 +251,14 @@ private fun SoapNavGraph(
             )
         }
 
+        composable(Routes.INSIGHTS) {
+            val vm: InsightsViewModel = viewModel(factory = InsightsViewModel.Factory(container))
+            InsightsScreen(
+                viewModel = vm,
+                onBack = { navController.popOrHome() }
+            )
+        }
+
         composable(Routes.SETTINGS) {
             SettingsScreen(
                 container = container,
@@ -277,6 +289,7 @@ internal fun resolveStartDestination(prefs: UserPreferences): String {
         prefs.resumeRoute == "bible" -> Routes.BIBLE
         prefs.resumeRoute == "plan" -> Routes.PLAN
         prefs.resumeRoute == "memory" -> Routes.MEMORY
+        prefs.resumeRoute == "insights" -> Routes.INSIGHTS
         else -> Routes.HOME
     }
 }

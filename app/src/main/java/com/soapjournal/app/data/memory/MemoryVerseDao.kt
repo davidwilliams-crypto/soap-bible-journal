@@ -11,6 +11,9 @@ interface MemoryVerseDao {
     @Query("SELECT * FROM memory_verses ORDER BY createdAtEpochMs DESC")
     fun observeAll(): Flow<List<MemoryVerseEntity>>
 
+    @Query("SELECT COUNT(*) FROM memory_verses")
+    fun observeCount(): Flow<Int>
+
     @Query("SELECT * FROM memory_verses ORDER BY id ASC")
     suspend fun getAll(): List<MemoryVerseEntity>
 

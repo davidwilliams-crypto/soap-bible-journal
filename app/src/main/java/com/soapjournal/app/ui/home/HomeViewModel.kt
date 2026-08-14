@@ -63,11 +63,15 @@ class HomeViewModel(
                 !existing.verse.text.startsWith("Unable to load")
             if (alreadyGood && !force) return@launch
             _votdLoading.value = existing == null
-            _verseOfTheDay.value = bible.verseOfTheDay(
+            val votd = bible.verseOfTheDay(
                 date = LocalDate.now(),
                 preferredVersion = preferredVersion
             )
+            _verseOfTheDay.value = votd
             _votdLoading.value = false
+            if (votd.verse.text.isNotBlank() && !votd.verse.text.startsWith("Unable to load")) {
+                prefsRepo.cacheVerseOfTheDay(votd.verse.reference, votd.verse.text, today)
+            }
         }
     }
 

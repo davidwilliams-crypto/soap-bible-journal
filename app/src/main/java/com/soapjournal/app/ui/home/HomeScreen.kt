@@ -49,6 +49,7 @@ fun HomeScreen(
     onOpenBible: () -> Unit,
     onOpenPlan: () -> Unit,
     onOpenMemory: () -> Unit,
+    onOpenInsights: () -> Unit,
     onOpenSettings: () -> Unit,
     resumeEntryId: Long? = null
 ) {
@@ -260,6 +261,7 @@ fun HomeScreen(
                     TextButton(onClick = onOpenBible) { Text("Bible") }
                     TextButton(onClick = onOpenMemory) { Text("Memorize") }
                     TextButton(onClick = onOpenHistory) { Text("Journal") }
+                    TextButton(onClick = onOpenInsights) { Text("Insights") }
                 }
 
                 if (prefs.currentStreak > 0) {
@@ -267,7 +269,8 @@ fun HomeScreen(
                     Text(
                         "${prefs.currentStreak}-day rhythm · longest ${prefs.longestStreak}",
                         style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                        modifier = Modifier.clickable(onClick = onOpenInsights)
                     )
                 }
 

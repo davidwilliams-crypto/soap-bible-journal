@@ -51,4 +51,19 @@ interface SoapEntryDao {
         """
     )
     suspend fun completedCountSince(fromDay: Long): Int
+
+    @Query("SELECT COUNT(*) FROM soap_entries WHERE isDraft = 0")
+    fun observeCompletedCount(): Flow<Int>
+
+    @Query("SELECT COUNT(DISTINCT entryDateEpochDay) FROM soap_entries WHERE isDraft = 0")
+    fun observeDaysJournaledCount(): Flow<Int>
+
+    @Query(
+        """
+        SELECT DISTINCT entryDateEpochDay FROM soap_entries
+        WHERE isDraft = 0 AND entryDateEpochDay >= :fromDay
+        ORDER BY entryDateEpochDay ASC
+        """
+    )
+    fun observeCompletedDaysSince(fromDay: Long): Flow<List<Long>>
 }
