@@ -30,4 +30,6 @@
     <string name="memorization">Memorization</string>
     <string name="settings">Settings</string>
     <string name="developer_contact">Please contact the developer to report bugs and get assistance.</string>
+    <string name="widget_title">SOAP</string>
+    <string name="widget_description">Your streak and today\'s verse, one tap from journaling.</string>
 </resources>

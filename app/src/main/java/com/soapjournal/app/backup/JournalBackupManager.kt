@@ -191,5 +191,10 @@ class JournalBackupManager(
         } else {
             reminders.cancelFollowThrough()
         }
+        if (restoredPrefs.streakRiskEnabled) {
+            reminders.scheduleStreakRisk(restoredPrefs.streakRiskHour)
+        } else {
+            reminders.cancelStreakRisk()
+        }
     }
 }

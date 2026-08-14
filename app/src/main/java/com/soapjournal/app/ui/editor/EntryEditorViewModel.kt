@@ -68,6 +68,8 @@ class EntryEditorViewModel(
         savedStateHandle.get<Boolean>(KEY_FOCUS) ?: false
     )
         private set
+    var celebrationMilestone by mutableStateOf<Int?>(null)
+        private set
 
     private var metadataPersistJob: Job? = null
     private var inkPersistJob: Job? = null
@@ -75,6 +77,11 @@ class EntryEditorViewModel(
     private val dirtyInkSections = mutableSetOf<SoapSection>()
 
     init {
+        viewModelScope.launch {
+            repository.milestoneEvents.collect { days ->
+                celebrationMilestone = days
+            }
+        }
         viewModelScope.launch {
             val loaded = repository.getEntry(entryId)
             entry = loaded
@@ -209,6 +216,10 @@ class EntryEditorViewModel(
 
     fun consumeStatus() {
         statusMessage = null
+    }
+
+    fun dismissCelebration() {
+        celebrationMilestone = null
     }
 
     fun markApplicationFollowThrough(done: Boolean) {

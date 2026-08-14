@@ -1,6 +1,7 @@
 package com.soapjournal.app.data.prefs
 
 import android.content.Context
+import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
@@ -12,8 +13,21 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
+import java.time.temporal.WeekFields
 
 private val Context.dataStore by preferencesDataStore("soap_prefs")
+
+/** Journaling streak milestones celebrated in-app, ascending. */
+val STREAK_MILESTONES = listOf(7, 30, 100, 365)
+
+/** ISO week-based key ("2026-W33") used to grant one streak-freeze per calendar week. */
+fun weekKeyForEpochDay(day: Long): String {
+    val date = LocalDate.ofEpochDay(day)
+    val fields = WeekFields.ISO
+    val week = date.get(fields.weekOfWeekBasedYear())
+    val year = date.get(fields.weekBasedYear())
+    return "$year-W$week"
+}
 
 data class UserPreferences(
     val darkTheme: Boolean = false,
@@ -27,6 +41,14 @@ data class UserPreferences(
     val currentStreak: Int = 0,
     val longestStreak: Int = 0,
     val lastCompletedEpochDay: Long = -1L,
+    val freezeWeekKey: String = "",
+    val freezesUsedInWeek: Int = 0,
+    val highestMilestoneAcknowledged: Int = 0,
+    val streakRiskEnabled: Boolean = true,
+    val streakRiskHour: Int = 21,
+    val cachedVotdReference: String = "",
+    val cachedVotdText: String = "",
+    val cachedVotdEpochDay: Long = -1L,
     val githubUpdateToken: String = "",
     val backupFolderUri: String = "",
     val lastBackupEpochMs: Long = 0L,
@@ -48,7 +70,10 @@ data class BackupPreferences(
     val planStartEpochDay: Long = LocalDate.now().toEpochDay(),
     val currentStreak: Int = 0,
     val longestStreak: Int = 0,
-    val lastCompletedEpochDay: Long = -1L
+    val lastCompletedEpochDay: Long = -1L,
+    val freezeWeekKey: String = "",
+    val freezesUsedInWeek: Int = 0,
+    val highestMilestoneAcknowledged: Int = 0
 )
 
 class UserPreferencesRepository(private val context: Context) {
@@ -64,6 +89,14 @@ class UserPreferencesRepository(private val context: Context) {
         val currentStreak = intPreferencesKey("current_streak")
         val longestStreak = intPreferencesKey("longest_streak")
         val lastCompleted = longPreferencesKey("last_completed_epoch_day")
+        val freezeWeekKey = stringPreferencesKey("freeze_week_key")
+        val freezesUsedInWeek = intPreferencesKey("freezes_used_in_week")
+        val highestMilestoneAcknowledged = intPreferencesKey("highest_milestone_acknowledged")
+        val streakRiskEnabled = booleanPreferencesKey("streak_risk_enabled")
+        val streakRiskHour = intPreferencesKey("streak_risk_hour")
+        val cachedVotdReference = stringPreferencesKey("cached_votd_reference")
+        val cachedVotdText = stringPreferencesKey("cached_votd_text")
+        val cachedVotdEpochDay = longPreferencesKey("cached_votd_epoch_day")
         val githubUpdateToken = stringPreferencesKey("github_update_token")
         val backupFolderUri = stringPreferencesKey("backup_folder_uri")
         val lastBackupEpochMs = longPreferencesKey("last_backup_epoch_ms")
@@ -87,6 +120,14 @@ class UserPreferencesRepository(private val context: Context) {
             currentStreak = prefs[Keys.currentStreak] ?: 0,
             longestStreak = prefs[Keys.longestStreak] ?: 0,
             lastCompletedEpochDay = prefs[Keys.lastCompleted] ?: -1L,
+            freezeWeekKey = prefs[Keys.freezeWeekKey].orEmpty(),
+            freezesUsedInWeek = prefs[Keys.freezesUsedInWeek] ?: 0,
+            highestMilestoneAcknowledged = prefs[Keys.highestMilestoneAcknowledged] ?: 0,
+            streakRiskEnabled = prefs[Keys.streakRiskEnabled] ?: true,
+            streakRiskHour = prefs[Keys.streakRiskHour] ?: 21,
+            cachedVotdReference = prefs[Keys.cachedVotdReference].orEmpty(),
+            cachedVotdText = prefs[Keys.cachedVotdText].orEmpty(),
+            cachedVotdEpochDay = prefs[Keys.cachedVotdEpochDay] ?: -1L,
             githubUpdateToken = prefs[Keys.githubUpdateToken].orEmpty(),
             backupFolderUri = prefs[Keys.backupFolderUri].orEmpty(),
             lastBackupEpochMs = prefs[Keys.lastBackupEpochMs] ?: 0L,
@@ -109,7 +150,10 @@ class UserPreferencesRepository(private val context: Context) {
             planStartEpochDay = prefs.planStartEpochDay,
             currentStreak = prefs.currentStreak,
             longestStreak = prefs.longestStreak,
-            lastCompletedEpochDay = prefs.lastCompletedEpochDay
+            lastCompletedEpochDay = prefs.lastCompletedEpochDay,
+            freezeWeekKey = prefs.freezeWeekKey,
+            freezesUsedInWeek = prefs.freezesUsedInWeek,
+            highestMilestoneAcknowledged = prefs.highestMilestoneAcknowledged
         )
     }
 
@@ -126,6 +170,9 @@ class UserPreferencesRepository(private val context: Context) {
             prefs[Keys.currentStreak] = backup.currentStreak
             prefs[Keys.longestStreak] = backup.longestStreak
             prefs[Keys.lastCompleted] = backup.lastCompletedEpochDay
+            prefs[Keys.freezeWeekKey] = backup.freezeWeekKey
+            prefs[Keys.freezesUsedInWeek] = backup.freezesUsedInWeek
+            prefs[Keys.highestMilestoneAcknowledged] = backup.highestMilestoneAcknowledged
         }
     }
 
@@ -218,7 +265,30 @@ class UserPreferencesRepository(private val context: Context) {
         }
     }
 
-    suspend fun recordDailyCompletion(date: LocalDate = LocalDate.now()) {
+    suspend fun setStreakRiskEnabled(enabled: Boolean) {
+        context.dataStore.edit { it[Keys.streakRiskEnabled] = enabled }
+    }
+
+    suspend fun setStreakRiskHour(hour: Int) {
+        context.dataStore.edit { it[Keys.streakRiskHour] = hour }
+    }
+
+    suspend fun cacheVerseOfTheDay(reference: String, text: String, epochDay: Long) {
+        context.dataStore.edit { prefs ->
+            prefs[Keys.cachedVotdReference] = reference
+            prefs[Keys.cachedVotdText] = text
+            prefs[Keys.cachedVotdEpochDay] = epochDay
+        }
+    }
+
+    /**
+     * Records a completed SOAP entry for [date] and rolls the streak forward.
+     * A single missed day per ISO week can be covered by a "freeze" so one bad day
+     * doesn't erase the habit. Returns the milestone (7/30/100/365) just reached, or
+     * null if this completion didn't cross a new one.
+     */
+    suspend fun recordDailyCompletion(date: LocalDate = LocalDate.now()): Int? {
+        var crossedMilestone: Int? = null
         context.dataStore.edit { prefs ->
             val day = date.toEpochDay()
             val last = prefs[Keys.lastCompleted] ?: -1L
@@ -228,13 +298,40 @@ class UserPreferencesRepository(private val context: Context) {
 
             val current = prefs[Keys.currentStreak] ?: 0
             val longest = prefs[Keys.longestStreak] ?: 0
+            val gapDays = day - last - 1
             val next = when {
                 last == day - 1L -> current + 1
+                last >= 0 && gapDays == 1L && tryConsumeFreeze(prefs, missedDay = last + 1) -> current + 1
                 else -> 1
             }
             prefs[Keys.currentStreak] = next
             prefs[Keys.longestStreak] = maxOf(longest, next)
             prefs[Keys.lastCompleted] = day
+
+            val highestAck = prefs[Keys.highestMilestoneAcknowledged] ?: 0
+            if (next in STREAK_MILESTONES && next > highestAck) {
+                prefs[Keys.highestMilestoneAcknowledged] = next
+                crossedMilestone = next
+            }
         }
+        return crossedMilestone
     }
+
+    /** Attempts to spend this week's single streak-freeze on [missedDay]; true if consumed. */
+    private fun tryConsumeFreeze(prefs: MutablePreferences, missedDay: Long): Boolean {
+        val weekKey = weekKeyForEpochDay(missedDay)
+        val storedWeek = prefs[Keys.freezeWeekKey]
+        val usedThisWeek = if (storedWeek == weekKey) prefs[Keys.freezesUsedInWeek] ?: 0 else 0
+        if (usedThisWeek >= 1) return false
+        prefs[Keys.freezeWeekKey] = weekKey
+        prefs[Keys.freezesUsedInWeek] = usedThisWeek + 1
+        return true
+    }
+}
+
+/** Freezes left for the ISO week containing [today]; 0 or 1. */
+fun freezesAvailable(prefs: UserPreferences, today: LocalDate = LocalDate.now()): Int {
+    val weekKey = weekKeyForEpochDay(today.toEpochDay())
+    val used = if (prefs.freezeWeekKey == weekKey) prefs.freezesUsedInWeek else 0
+    return (1 - used).coerceIn(0, 1)
 }

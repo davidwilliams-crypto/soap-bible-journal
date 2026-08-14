@@ -82,12 +82,16 @@ fun SettingsScreen(
     var signatureMismatchUpdate by remember { mutableStateOf<AvailableUpdate?>(null) }
     var reminderHour by remember { mutableFloatStateOf(prefs.reminderHour.toFloat()) }
     var followThroughHour by remember { mutableFloatStateOf(prefs.followThroughHour.toFloat()) }
+    var streakRiskHour by remember { mutableFloatStateOf(prefs.streakRiskHour.toFloat()) }
 
     LaunchedEffect(prefs.reminderHour) {
         reminderHour = prefs.reminderHour.toFloat()
     }
     LaunchedEffect(prefs.followThroughHour) {
         followThroughHour = prefs.followThroughHour.toFloat()
+    }
+    LaunchedEffect(prefs.streakRiskHour) {
+        streakRiskHour = prefs.streakRiskHour.toFloat()
     }
 
     val chooseDriveFolder = rememberLauncherForActivityResult(
@@ -316,6 +320,54 @@ fun SettingsScreen(
                     },
                     valueRange = 16f..22f,
                     steps = 5
+                )
+
+                Text(
+                    "A late nudge only if today's SOAP is still open and you have a streak to protect.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Streak-at-risk reminder", modifier = Modifier.weight(1f))
+                    Switch(
+                        checked = prefs.streakRiskEnabled,
+                        onCheckedChange = { enabled ->
+                            scope.launch {
+                                container.prefs.setStreakRiskEnabled(enabled)
+                                if (enabled) {
+                                    if (Build.VERSION.SDK_INT >= 33) {
+                                        permissionLauncher.launch(
+                                            Manifest.permission.POST_NOTIFICATIONS
+                                        )
+                                    }
+                                    container.reminders.scheduleStreakRisk(
+                                        prefs.streakRiskHour
+                                    )
+                                } else {
+                                    container.reminders.cancelStreakRisk()
+                                }
+                            }
+                        }
+                    )
+                }
+                Text("Streak-at-risk hour: ${streakRiskHour.toInt()}:00")
+                Slider(
+                    value = streakRiskHour,
+                    onValueChange = { streakRiskHour = it },
+                    onValueChangeFinished = {
+                        scope.launch {
+                            val hour = streakRiskHour.toInt()
+                            container.prefs.setStreakRiskHour(hour)
+                            if (prefs.streakRiskEnabled) {
+                                container.reminders.scheduleStreakRisk(hour)
+                            }
+                        }
+                    },
+                    valueRange = 18f..23f,
+                    steps = 4
                 )
             }
 

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@drawable/widget_background"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/widget_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_title"
+        android:textColor="@color/widget_olive"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:letterSpacing="0.08" />
+
+    <TextView
+        android:id="@+id/widget_streak"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textColor="@color/widget_ink"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:maxLines="1"
+        android:ellipsize="end"
+        tools:text="7-day rhythm" />
+
+    <LinearLayout
+        android:id="@+id/widget_verse_group"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginTop="10dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/widget_reference"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/widget_ink_muted"
+            android:textSize="11sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            tools:text="John 3:16" />
+
+        <TextView
+            android:id="@+id/widget_verse"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/widget_ink"
+            android:textSize="13sp"
+            android:maxLines="3"
+            android:ellipsize="end"
+            tools:text="For God so loved the world that he gave his one and only Son…" />
+    </LinearLayout>
+</LinearLayout>

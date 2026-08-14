@@ -4,6 +4,7 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import com.soapjournal.app.notifications.MilestoneNotifier
 import com.soapjournal.app.notifications.ReminderScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,14 @@ class SoapJournalApplication : Application() {
             if (prefs.followThroughEnabled) {
                 container.reminders.scheduleFollowThrough(prefs.followThroughHour)
             }
+            if (prefs.streakRiskEnabled) {
+                container.reminders.scheduleStreakRisk(prefs.streakRiskHour)
+            }
+        }
+        appScope.launch {
+            container.repository.milestoneEvents.collect { days ->
+                MilestoneNotifier.celebrate(this@SoapJournalApplication, days)
+            }
         }
     }
 
@@ -49,6 +58,20 @@ class SoapJournalApplication : Application() {
                 ReminderScheduler.CHANNEL_FOLLOW_THROUGH,
                 "Application & prayer follow-through",
                 NotificationManager.IMPORTANCE_DEFAULT
+            )
+        )
+        manager.createNotificationChannel(
+            NotificationChannel(
+                ReminderScheduler.CHANNEL_STREAK_RISK,
+                "Streak at risk",
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+        )
+        manager.createNotificationChannel(
+            NotificationChannel(
+                MilestoneNotifier.CHANNEL_MILESTONE,
+                "Streak milestones",
+                NotificationManager.IMPORTANCE_HIGH
             )
         )
     }

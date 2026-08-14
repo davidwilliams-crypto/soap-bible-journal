@@ -6,6 +6,9 @@ import com.soapjournal.app.data.memory.MemoryVerseDao
 import com.soapjournal.app.data.memory.MemoryVerseEntity
 import com.soapjournal.app.data.prefs.UserPreferencesRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import java.time.LocalDate
 import java.time.ZoneId
 
@@ -15,6 +18,11 @@ class JournalRepository(
     private val memoryDao: MemoryVerseDao,
     private val prefs: UserPreferencesRepository
 ) {
+    private val _milestoneEvents = MutableSharedFlow<Int>(extraBufferCapacity = 1)
+
+    /** Emits a streak milestone (7/30/100/365) the moment it's reached. */
+    val milestoneEvents: SharedFlow<Int> = _milestoneEvents.asSharedFlow()
+
     fun observeEntries(): Flow<List<SoapEntryEntity>> = dao.observeAll()
 
     fun search(query: String): Flow<List<SoapEntryEntity>> =
@@ -22,7 +30,20 @@ class JournalRepository(
 
     fun observeMemoryVerses(): Flow<List<MemoryVerseEntity>> = memoryDao.observeAll()
 
+    fun observeMemoryVerseCount(): Flow<Int> = memoryDao.observeCount()
+
+    fun observeCompletedEntryCount(): Flow<Int> = dao.observeCompletedCount()
+
+    fun observeDaysJournaledCount(): Flow<Int> = dao.observeDaysJournaledCount()
+
+    /** Distinct completed-entry days on or after [sinceEpochDay], ascending — for a heatmap. */
+    fun observeHeatmapDays(sinceEpochDay: Long): Flow<List<Long>> =
+        dao.observeCompletedDaysSince(sinceEpochDay)
+
     suspend fun getEntry(id: Long): SoapEntryEntity? = dao.getById(id)
+
+    suspend fun getTodayEntry(date: LocalDate = LocalDate.now()): SoapEntryEntity? =
+        dao.getForDate(date.toEpochDay())
 
     suspend fun getOrCreateTodayEntry(
         scriptureReference: String = "",
@@ -162,7 +183,10 @@ class JournalRepository(
         val today = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
         // Editing past entries must not rewrite or reset today's streak.
         if (entry.entryDateEpochDay == today) {
-            prefs.recordDailyCompletion(LocalDate.ofEpochDay(today))
+            val milestone = prefs.recordDailyCompletion(LocalDate.ofEpochDay(today))
+            if (milestone != null) {
+                _milestoneEvents.emit(milestone)
+            }
         }
     }
 }
