@@ -2,14 +2,17 @@ package com.soapjournal.app.ui.plan
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -27,13 +30,22 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.soapjournal.app.AppContainer
 import com.soapjournal.app.data.plan.ReadingPlan
 import com.soapjournal.app.ui.components.ConfirmActionDialog
+import com.soapjournal.app.ui.components.Kicker
+import com.soapjournal.app.ui.components.NocturneCard
+import com.soapjournal.app.ui.components.PrimaryButton
+import com.soapjournal.app.ui.components.SecondaryButton
+import com.soapjournal.app.ui.components.Tag
+import com.soapjournal.app.ui.components.TagStyle
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
+import com.soapjournal.app.ui.theme.ScriptureFamily
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -42,6 +54,7 @@ import java.time.LocalDate
 fun ReadingPlanScreen(
     container: AppContainer,
     onBack: () -> Unit,
+    onOpenBible: () -> Unit,
     onOpenEntry: (Long) -> Unit
 ) {
     val prefs by container.prefs.preferences.collectAsStateWithLifecycle(
@@ -97,70 +110,81 @@ fun ReadingPlanScreen(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                "Whole Bible in two years",
-                style = MaterialTheme.typography.headlineMedium
-            )
-            Text(
-                "Day ${today.dayIndex + 1} of ${ReadingPlan.TOTAL_DAYS}",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    "Whole Bible in two years",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                Tag("Day ${today.dayIndex + 1} / ${ReadingPlan.TOTAL_DAYS}", style = TagStyle.Accent)
+            }
             LinearProgressIndicator(
                 progress = { ReadingPlan.progressFraction(start).coerceIn(0f, 1f) },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(6.dp)
+                    .clip(RoundedCornerShape(999.dp)),
+                trackColor = surfaces.paperDeep
             )
-            Text(today.label, style = MaterialTheme.typography.headlineSmall)
-            when {
-                passageLoading -> {
-                    Text(
-                        "Loading ${prefs.bibleVersion.displayName}…",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                passageText.isNotBlank() -> {
-                    Text(
-                        passageText.take(500) + if (passageText.length > 500) "…" else "",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                }
-                else -> {
-                    Text(
-                        "No preview for this passage offline. Journal it to load the full text when connected.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            Button(
-                onClick = {
-                    scope.launch {
-                        val text = passageText.ifBlank {
-                            container.bible.passageText(today.passages, prefs.bibleVersion)
-                        }
-                        val entry = container.repository.getOrCreateTodayEntry(
-                            scriptureReference = today.label,
-                            scriptureText = text,
-                            readingPlanDay = today.dayIndex
+            NocturneCard(modifier = Modifier.fillMaxWidth()) {
+                Kicker("Today")
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(today.label, style = MaterialTheme.typography.headlineSmall)
+                Spacer(modifier = Modifier.height(6.dp))
+                when {
+                    passageLoading -> {
+                        Text(
+                            "Loading ${prefs.bibleVersion.displayName}…",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                        onOpenEntry(entry.id)
                     }
-                },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Journal today’s passage")
+                    passageText.isNotBlank() -> {
+                        Text(
+                            passageText.take(500) + if (passageText.length > 500) "…" else "",
+                            style = MaterialTheme.typography.bodyLarge.copy(fontFamily = ScriptureFamily)
+                        )
+                    }
+                    else -> {
+                        Text(
+                            "No preview for this passage offline. Journal it to load the full text when connected.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SecondaryButton(onClick = onOpenBible) {
+                        Text("Read passage")
+                    }
+                    PrimaryButton(
+                        onClick = {
+                            scope.launch {
+                                val text = passageText.ifBlank {
+                                    container.bible.passageText(today.passages, prefs.bibleVersion)
+                                }
+                                val entry = container.repository.getOrCreateTodayEntry(
+                                    scriptureReference = today.label,
+                                    scriptureText = text,
+                                    readingPlanDay = today.dayIndex
+                                )
+                                onOpenEntry(entry.id)
+                            }
+                        }
+                    ) {
+                        Text("Journal this passage")
+                    }
+                }
             }
             TextButton(onClick = { confirmRestart = true }) {
                 Text("Restart plan from today")
             }
 
-            Text(
-                "NEXT TWO WEEKS",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.padding(top = 8.dp)
-            )
+            Kicker("Up next", modifier = Modifier.padding(top = 8.dp))
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp)

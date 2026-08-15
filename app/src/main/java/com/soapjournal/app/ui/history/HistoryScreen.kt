@@ -15,6 +15,7 @@ import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -121,8 +122,7 @@ fun HistoryScreen(
             } else {
                 LazyColumn(
                     modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(bottom = 24.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    contentPadding = PaddingValues(bottom = 24.dp)
                 ) {
                     items(entries, key = { it.id }) { entry ->
                         val date = LocalDate.ofEpochDay(entry.entryDateEpochDay)
@@ -169,6 +169,7 @@ fun HistoryScreen(
                                 Icon(Icons.Outlined.Delete, contentDescription = "Delete")
                             }
                         }
+                        HorizontalDivider(color = surfaces.rule)
                     }
                 }
             }

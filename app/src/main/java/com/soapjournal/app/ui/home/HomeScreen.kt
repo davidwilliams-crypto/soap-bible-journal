@@ -16,8 +16,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalFireDepartment
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.Notes
+import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material3.Button
+import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -28,6 +32,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
@@ -36,8 +41,11 @@ import com.soapjournal.app.data.plan.ReadingPlan
 import com.soapjournal.app.data.prefs.liveStreak
 import com.soapjournal.app.ui.bible.RedLetterVerseText
 import com.soapjournal.app.ui.components.JournalAtmosphere
+import com.soapjournal.app.ui.components.Kicker
+import com.soapjournal.app.ui.components.PrimaryButton
 import com.soapjournal.app.ui.components.RitualEnter
 import com.soapjournal.app.ui.components.ScriptureQuotation
+import com.soapjournal.app.ui.components.SecondaryButton
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -86,7 +94,18 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.Top
                     ) {
-                        Spacer(modifier = Modifier.weight(1f))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "SOAP",
+                                style = MaterialTheme.typography.displayLarge,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                "Bible Journal",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
                         IconButton(onClick = onOpenSettings) {
                             Icon(
                                 Icons.Outlined.Settings,
@@ -96,23 +115,13 @@ fun HomeScreen(
                         }
                     }
 
-                    Text(
-                        "SOAP",
-                        style = MaterialTheme.typography.displayLarge,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Text(
-                        "Bible Journal",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         today.format(DateTimeFormatter.ofPattern("EEEE, MMMM d")),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         if (todayEntry != null) {
                             "Return to today’s reflection."
@@ -122,15 +131,15 @@ fun HomeScreen(
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onBackground
                     )
-                    Spacer(modifier = Modifier.height(28.dp))
-                    Button(
+                    Spacer(modifier = Modifier.height(20.dp))
+                    PrimaryButton(
                         onClick = {
                             if (todayEntry != null) onOpenEntry(todayEntry.id)
                             else viewModel.openToday(onOpenEntry)
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(52.dp)
+                            .height(48.dp)
                     ) {
                         Text(
                             if (todayEntry != null) "Continue today’s SOAP" else "Begin today’s SOAP",
@@ -162,7 +171,7 @@ fun HomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(48.dp))
+                Spacer(modifier = Modifier.height(28.dp))
 
                 // Below the fold: scripture, then plan — quiet, not a dashboard.
                 when {
@@ -211,6 +220,11 @@ fun HomeScreen(
                                 },
                                 modifier = Modifier.padding(top = 4.dp)
                             ) {
+                                Icon(
+                                    Icons.Outlined.Psychology,
+                                    contentDescription = null,
+                                    modifier = Modifier.padding(end = 6.dp)
+                                )
                                 Text(
                                     if (todayVerse.verse.text.startsWith("Unable to load")) {
                                         "Try again"
@@ -223,7 +237,7 @@ fun HomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(36.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
                 Column(
                     modifier = Modifier
@@ -231,11 +245,7 @@ fun HomeScreen(
                         .clickable(onClick = onOpenPlan),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        "TODAY’S READING",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
+                    Kicker("Today's reading")
                     Text(
                         reading.label,
                         style = MaterialTheme.typography.headlineSmall
@@ -253,31 +263,49 @@ fun HomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(32.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TextButton(onClick = onOpenBible) { Text("Bible") }
-                    TextButton(onClick = onOpenMemory) { Text("Memorize") }
-                    TextButton(onClick = onOpenHistory) { Text("Journal") }
-                    TextButton(onClick = onOpenInsights) { Text("Insights") }
+                    QuickLink("Bible", Icons.AutoMirrored.Outlined.MenuBook, onOpenBible)
+                    QuickLink("Memorize", Icons.Outlined.Psychology, onOpenMemory)
+                    QuickLink("Journal", Icons.Outlined.Notes, onOpenHistory)
+                    QuickLink("Insights", Icons.Outlined.TrendingUp, onOpenInsights)
                 }
 
                 val streak = liveStreak(prefs)
                 if (streak > 0) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        "$streak-day rhythm · longest ${prefs.longestStreak}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.clickable(onClick = onOpenInsights)
-                    )
+                    ) {
+                        Icon(
+                            Icons.Filled.LocalFireDepartment,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(end = 6.dp)
+                        )
+                        Text(
+                            "$streak-day rhythm · longest ${prefs.longestStreak}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
+    }
+}
+
+@Composable
+private fun QuickLink(label: String, icon: ImageVector, onClick: () -> Unit) {
+    SecondaryButton(onClick = onClick) {
+        Icon(icon, contentDescription = null, modifier = Modifier.padding(end = 6.dp))
+        Text(label, style = MaterialTheme.typography.labelMedium)
     }
 }

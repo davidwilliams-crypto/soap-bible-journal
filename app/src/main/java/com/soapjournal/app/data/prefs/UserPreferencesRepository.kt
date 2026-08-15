@@ -30,7 +30,7 @@ fun weekKeyForEpochDay(day: Long): String {
 }
 
 data class UserPreferences(
-    val darkTheme: Boolean = false,
+    val darkTheme: Boolean = true,
     val bibleVersion: BibleVersion = BibleVersion.PREFERRED_DEFAULT,
     val remindersEnabled: Boolean = true,
     val reminderHour: Int = 8,
@@ -107,7 +107,7 @@ class UserPreferencesRepository(private val context: Context) {
 
     val preferences: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
         UserPreferences(
-            darkTheme = prefs[Keys.darkTheme] ?: false,
+            darkTheme = prefs[Keys.darkTheme] ?: true,
             bibleVersion = BibleVersion.fromName(
                 prefs[Keys.bibleVersion] ?: BibleVersion.PREFERRED_DEFAULT.name
             ),
