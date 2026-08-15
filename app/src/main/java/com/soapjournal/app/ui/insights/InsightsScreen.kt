@@ -38,6 +38,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.soapjournal.app.data.prefs.STREAK_MILESTONES
 import com.soapjournal.app.data.prefs.freezesAvailable
 import com.soapjournal.app.data.prefs.liveStreak
+import com.soapjournal.app.ui.components.Kicker
+import com.soapjournal.app.ui.components.NocturneCard
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 import java.time.LocalDate
 
@@ -90,12 +92,18 @@ fun InsightsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 StatTile("Longest streak", "${prefs.longestStreak}", Modifier.weight(1f))
                 StatTile("Days journaled", "$daysJournaled", Modifier.weight(1f))
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(modifier = Modifier.fillMaxWidth()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
                 StatTile("Entries written", "$completedEntries", Modifier.weight(1f))
                 StatTile("Verses memorized", "$versesMemorized", Modifier.weight(1f))
             }
@@ -112,22 +120,14 @@ fun InsightsScreen(
             )
 
             Spacer(modifier = Modifier.height(32.dp))
-            Text(
-                "JOURNALING",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
+            Kicker("Journaling")
             Spacer(modifier = Modifier.height(10.dp))
             JournalHeatmap(completedDays = heatmapDays, weeks = INSIGHTS_HEATMAP_WEEKS)
             Spacer(modifier = Modifier.height(8.dp))
             HeatmapLegend()
 
             Spacer(modifier = Modifier.height(32.dp))
-            Text(
-                "MILESTONES",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.secondary
-            )
+            Kicker("Milestones")
             Spacer(modifier = Modifier.height(12.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -148,7 +148,7 @@ fun InsightsScreen(
 
 @Composable
 private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
+    NocturneCard(modifier = modifier) {
         Text(
             value,
             style = MaterialTheme.typography.headlineMedium,

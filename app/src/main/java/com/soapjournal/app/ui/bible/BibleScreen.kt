@@ -21,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Psychology
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -56,6 +55,8 @@ import com.soapjournal.app.AppContainer
 import com.soapjournal.app.data.bible.BibleVerse
 import com.soapjournal.app.data.bible.BibleVersion
 import com.soapjournal.app.data.prefs.UserPreferences
+import com.soapjournal.app.ui.components.PrimaryButton
+import com.soapjournal.app.ui.components.SecondaryButton
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 import kotlinx.coroutines.launch
 
@@ -173,8 +174,8 @@ fun BibleScreen(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = { bookPicker = true }) { Text(book) }
-                TextButton(onClick = { chapterPicker = true }) { Text("Ch $chapter") }
+                SecondaryButton(onClick = { bookPicker = true }) { Text(book) }
+                SecondaryButton(onClick = { chapterPicker = true }) { Text("Ch $chapter") }
                 Spacer(modifier = Modifier.weight(1f))
                 Box {
                     TextButton(onClick = { versionMenu = true }) {
@@ -245,7 +246,7 @@ fun BibleScreen(
                     )
                 }
                 else -> {
-                    Button(
+                    PrimaryButton(
                         onClick = {
                             val text = verses.joinToString("\n\n") { "${it.verse} ${it.text}" }
                             onJournalPassage("$book $chapter", text)

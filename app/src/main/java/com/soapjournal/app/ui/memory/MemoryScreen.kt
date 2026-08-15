@@ -12,7 +12,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -39,6 +38,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.soapjournal.app.AppContainer
 import com.soapjournal.app.data.memory.MemoryVerseEntity
 import com.soapjournal.app.ui.components.ConfirmActionDialog
+import com.soapjournal.app.ui.components.NocturneCard
+import com.soapjournal.app.ui.components.PrimaryButton
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
@@ -151,7 +152,7 @@ fun MemoryScreen(
                         TextButton(onClick = { revealed = !revealed }) {
                             Text(if (revealed) "Hide" else "Reveal")
                         }
-                        Button(onClick = {
+                        PrimaryButton(onClick = {
                             vm.review(card.id)
                             practice = null
                             revealed = false
@@ -176,44 +177,46 @@ fun MemoryScreen(
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = MaterialTheme.typography.bodyLarge
             )
-            Button(
+            PrimaryButton(
                 onClick = {
                     if (reference.isNotBlank() && text.isNotBlank()) {
                         vm.add(reference, text)
                         reference = ""
                         text = ""
                     }
-                }
+                },
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Add verse")
             }
 
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 items(verses, key = { it.id }) { verse ->
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Column(
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Text(verse.reference, style = MaterialTheme.typography.titleMedium)
-                            Text(
-                                "Mastery ${verse.masteryLevel}",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            TextButton(onClick = {
-                                practice = verse
-                                revealed = false
-                            }) {
-                                Text("Practice")
+                    NocturneCard(modifier = Modifier.fillMaxWidth()) {
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(verse.reference, style = MaterialTheme.typography.titleMedium)
+                                Text(
+                                    "Mastery ${verse.masteryLevel}",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                TextButton(
+                                    onClick = {
+                                        practice = verse
+                                        revealed = false
+                                    },
+                                    modifier = Modifier.padding(top = 4.dp)
+                                ) {
+                                    Text("Practice")
+                                }
                             }
-                        }
-                        IconButton(onClick = { pendingDeleteId = verse.id }) {
-                            Icon(Icons.Outlined.Delete, contentDescription = "Delete")
+                            IconButton(onClick = { pendingDeleteId = verse.id }) {
+                                Icon(Icons.Outlined.Delete, contentDescription = "Delete")
+                            }
                         }
                     }
                 }

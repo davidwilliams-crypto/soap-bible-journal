@@ -16,13 +16,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
-import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -51,6 +49,8 @@ import com.soapjournal.app.update.InstallPrepResult
 import com.soapjournal.app.update.UpdateCheckResult
 import com.soapjournal.app.data.prefs.liveStreak
 import com.soapjournal.app.ui.components.ConfirmActionDialog
+import com.soapjournal.app.ui.components.PrimaryButton
+import com.soapjournal.app.ui.components.SecondaryButton
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 import kotlinx.coroutines.launch
 
@@ -205,9 +205,9 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Dark paper", style = MaterialTheme.typography.titleMedium)
+                        Text("Nocturne dark theme", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "Warm night pages for evening journaling",
+                            "Dark by default; switch off for the light paper mode",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -392,7 +392,7 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                OutlinedButton(
+                SecondaryButton(
                     onClick = { chooseDriveFolder.launch(null) },
                     enabled = !backupBusy,
                     modifier = Modifier.fillMaxWidth()
@@ -405,7 +405,7 @@ fun SettingsScreen(
                         }
                     )
                 }
-                Button(
+                PrimaryButton(
                     onClick = {
                         scope.launch {
                             backupBusy = true
@@ -422,7 +422,7 @@ fun SettingsScreen(
                 ) {
                     Text(if (backupBusy) "Working…" else "Back up now")
                 }
-                OutlinedButton(
+                SecondaryButton(
                     onClick = { confirmRestoreFromFolder = true },
                     enabled = !backupBusy && prefs.backupFolderUri.isNotBlank(),
                     modifier = Modifier.fillMaxWidth()
@@ -457,7 +457,7 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                OutlinedButton(
+                SecondaryButton(
                     onClick = {
                         scope.launch {
                             checking = true
@@ -494,7 +494,7 @@ fun SettingsScreen(
                 }
 
                 availableUpdate?.let { update ->
-                    Button(
+                    PrimaryButton(
                         onClick = {
                             scope.launch {
                                 if (!container.updates.canInstallPackages()) {
@@ -593,12 +593,12 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Typography: Instrument Serif, Cardo, Atkinson Hyperlegible (SIL Open Font License).",
+                    "Typography: Inter (SIL Open Font License).",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Designed as a calm, paper-first SOAP journal — ink over chrome.",
+                    "Nocturne — a dark-first design system with a single blurple accent, and a light paper mode alongside it.",
                     style = MaterialTheme.typography.bodyMedium
                 )
             }

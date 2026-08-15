@@ -2,25 +2,25 @@ package com.soapjournal.app.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-/** Warm paper wash — light journal atmosphere. */
-val Paper = Color(0xFFF7F1E8)
-val PaperDeep = Color(0xFFEDE4D4)
-val PaperDark = Color(0xFFE8DFD0)
-val PaperMargin = Color(0xFFD4C4A8)
-val InkBrown = Color(0xFF2C2416)
-val Olive = Color(0xFF5C6B4A)
-val OliveDark = Color(0xFF3F4A34)
-val SoftClay = Color(0xFF8B5E3C)
-val Mist = Color(0xFFD9CFC0)
-val Danger = Color(0xFF8B3A3A)
-val JesusRed = Color(0xFFC62828)
+/** Nocturne — dark-first, single blurple accent. */
+val NocturneBg = Color(0xFF161826)
+val NocturneSurface = Color(0xFF232532)
+val NocturneText = Color(0xFFE9E9ED)
+val NocturneAccent = Color(0xFF9184D9)
+val NocturneAccent300 = Color(0xFFD2CEFD)
+val NocturneDivider = Color(0x29E9E9ED)
+val NocturneMuted = Color(0xFF3A3D50)
+val NocturneJesusRed = Color(0xFFD98B85)
 
-/** Warm night paper — ink canvas stays journal-like in dark theme. */
-val NightBg = Color(0xFF1C1A17)
-val NightSurface = Color(0xFF2A2621)
-val NightPaper = Color(0xFF2F2A24)
-val NightPaperRule = Color(0xFF433C34)
-val NightInk = Color(0xFFF2EBE0)
-val NightOlive = Color(0xFF9BB08A)
-val NightMist = Color(0xFF3E3830)
-val NightJesusRed = Color(0xFFE57373)
+/** Nocturne "paper mode" — same structure, light ramp. */
+val PaperBg = Color(0xFFF4F3FB)
+val PaperSurface = Color(0xFFE9E7F4)
+val PaperText = Color(0xFF292B31)
+val PaperAccent = Color(0xFF6F62C4)
+val PaperAccent300 = Color(0xFF5D5294)
+val PaperDivider = Color(0x24292B31)
+val PaperMuted = Color(0xFFD8D5EC)
+val PaperJesusRed = Color(0xFFA8453F)
+
+val NocturneDanger = Color(0xFFE0736B)
+val PaperDanger = Color(0xFF8B3A3A)

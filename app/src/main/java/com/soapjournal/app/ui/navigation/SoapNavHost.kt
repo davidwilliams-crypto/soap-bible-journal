@@ -7,7 +7,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -32,6 +34,8 @@ import androidx.navigation.navArgument
 import com.soapjournal.app.AppContainer
 import com.soapjournal.app.data.prefs.UserPreferences
 import com.soapjournal.app.ui.bible.BibleScreen
+import com.soapjournal.app.ui.components.BottomTab
+import com.soapjournal.app.ui.components.NocturneBottomBar
 import com.soapjournal.app.ui.editor.EntryEditorScreen
 import com.soapjournal.app.ui.editor.EntryEditorViewModel
 import com.soapjournal.app.ui.history.HistoryScreen
@@ -41,6 +45,7 @@ import com.soapjournal.app.ui.home.HomeViewModel
 import com.soapjournal.app.ui.insights.InsightsScreen
 import com.soapjournal.app.ui.insights.InsightsViewModel
 import com.soapjournal.app.ui.memory.MemoryScreen
+import com.soapjournal.app.ui.more.MoreScreen
 import com.soapjournal.app.ui.plan.ReadingPlanScreen
 import com.soapjournal.app.ui.settings.SettingsScreen
 import kotlinx.coroutines.CoroutineScope
@@ -53,9 +58,13 @@ object Routes {
     const val EDITOR = "editor/{entryId}"
     const val BIBLE = "bible"
     const val PLAN = "plan"
+    const val MORE = "more"
     const val MEMORY = "memory"
     const val INSIGHTS = "insights"
     const val SETTINGS = "settings"
+
+    /** The five persistent bottom-tab destinations. */
+    val BOTTOM_TAB_ROUTES = setOf(HOME, BIBLE, HISTORY, PLAN, MORE)
 
     fun editor(entryId: Long) = "editor/$entryId"
 }
@@ -152,117 +161,160 @@ private fun SoapNavGraph(
         navController.popOrHome()
     }
 
-    NavHost(
-        navController = navController,
-        startDestination = graphStart,
-        enterTransition = { enter },
-        exitTransition = { exit },
-        popEnterTransition = { popEnter },
-        popExitTransition = { popExit }
-    ) {
-        composable(Routes.HOME) {
-            val vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory(container))
-            val livePrefs by container.prefs.preferences.collectAsStateWithLifecycle(
-                initialValue = prefsSnapshot
-            )
-            HomeScreen(
-                viewModel = vm,
-                onOpenEntry = { id -> navController.navigate(Routes.editor(id)) },
-                onOpenHistory = { navController.navigate(Routes.HISTORY) },
-                onOpenBible = { navController.navigate(Routes.BIBLE) },
-                onOpenPlan = { navController.navigate(Routes.PLAN) },
-                onOpenMemory = { navController.navigate(Routes.MEMORY) },
-                onOpenInsights = { navController.navigate(Routes.INSIGHTS) },
-                onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-                resumeEntryId = livePrefs.resumeEntryId.takeIf {
-                    livePrefs.resumeRoute == "editor" && it > 0L
+    val showBottomBar = currentRoute != null && currentRoute in Routes.BOTTOM_TAB_ROUTES
+    val selectedTab = when (currentRoute) {
+        Routes.BIBLE -> BottomTab.BIBLE
+        Routes.HISTORY -> BottomTab.JOURNAL
+        Routes.PLAN -> BottomTab.PLAN
+        Routes.MORE -> BottomTab.MORE
+        else -> BottomTab.HOME
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        NavHost(
+            navController = navController,
+            startDestination = graphStart,
+            modifier = Modifier.weight(1f),
+            enterTransition = { enter },
+            exitTransition = { exit },
+            popEnterTransition = { popEnter },
+            popExitTransition = { popExit }
+        ) {
+            composable(Routes.HOME) {
+                val vm: HomeViewModel = viewModel(factory = HomeViewModel.Factory(container))
+                val livePrefs by container.prefs.preferences.collectAsStateWithLifecycle(
+                    initialValue = prefsSnapshot
+                )
+                HomeScreen(
+                    viewModel = vm,
+                    onOpenEntry = { id -> navController.navigate(Routes.editor(id)) },
+                    onOpenHistory = { navController.navigate(Routes.HISTORY) },
+                    onOpenBible = { navController.navigate(Routes.BIBLE) },
+                    onOpenPlan = { navController.navigate(Routes.PLAN) },
+                    onOpenMemory = { navController.navigate(Routes.MEMORY) },
+                    onOpenInsights = { navController.navigate(Routes.INSIGHTS) },
+                    onOpenSettings = { navController.navigate(Routes.SETTINGS) },
+                    resumeEntryId = livePrefs.resumeEntryId.takeIf {
+                        livePrefs.resumeRoute == "editor" && it > 0L
+                    }
+                )
+            }
+
+            composable(Routes.HISTORY) {
+                val vm: HistoryViewModel = viewModel(
+                    factory = HistoryViewModel.Factory(container.repository)
+                )
+                HistoryScreen(
+                    viewModel = vm,
+                    onBack = { navController.popOrHome() },
+                    onOpenEntry = { id -> navController.navigate(Routes.editor(id)) }
+                )
+            }
+
+            composable(
+                route = Routes.EDITOR,
+                arguments = listOf(navArgument("entryId") { type = NavType.LongType })
+            ) { backStackEntry ->
+                val entryId = backStackEntry.arguments?.getLong("entryId") ?: return@composable
+                val initialSection = prefsSnapshot.resumeSection.takeIf {
+                    prefsSnapshot.resumeEntryId == entryId && it.isNotBlank()
                 }
-            )
-        }
-
-        composable(Routes.HISTORY) {
-            val vm: HistoryViewModel = viewModel(
-                factory = HistoryViewModel.Factory(container.repository)
-            )
-            HistoryScreen(
-                viewModel = vm,
-                onBack = { navController.popOrHome() },
-                onOpenEntry = { id -> navController.navigate(Routes.editor(id)) }
-            )
-        }
-
-        composable(
-            route = Routes.EDITOR,
-            arguments = listOf(navArgument("entryId") { type = NavType.LongType })
-        ) { backStackEntry ->
-            val entryId = backStackEntry.arguments?.getLong("entryId") ?: return@composable
-            val initialSection = prefsSnapshot.resumeSection.takeIf {
-                prefsSnapshot.resumeEntryId == entryId && it.isNotBlank()
-            }
-            val factory = remember(entryId, initialSection) {
-                EntryEditorViewModel.Factory(
-                    repository = container.repository,
-                    entryId = entryId,
-                    initialSectionKey = initialSection
+                val factory = remember(entryId, initialSection) {
+                    EntryEditorViewModel.Factory(
+                        repository = container.repository,
+                        entryId = entryId,
+                        initialSectionKey = initialSection
+                    )
+                }
+                val vm: EntryEditorViewModel = viewModel(factory = factory)
+                LaunchedEffect(vm.selectedSection) {
+                    container.prefs.setResumeSession(
+                        route = "editor",
+                        entryId = entryId,
+                        section = vm.selectedSection.key
+                    )
+                }
+                EntryEditorScreen(
+                    viewModel = vm,
+                    onBack = { navController.popOrHome() }
                 )
             }
-            val vm: EntryEditorViewModel = viewModel(factory = factory)
-            LaunchedEffect(vm.selectedSection) {
-                container.prefs.setResumeSession(
-                    route = "editor",
-                    entryId = entryId,
-                    section = vm.selectedSection.key
+
+            composable(Routes.BIBLE) {
+                BibleScreen(
+                    container = container,
+                    onBack = { navController.popOrHome() },
+                    onJournalPassage = { reference, text ->
+                        scope.launch {
+                            val entry = container.repository.getOrCreateTodayEntry(
+                                scriptureReference = reference,
+                                scriptureText = text
+                            )
+                            navController.navigate(Routes.editor(entry.id))
+                        }
+                    }
                 )
             }
-            EntryEditorScreen(
-                viewModel = vm,
-                onBack = { navController.popOrHome() }
-            )
+
+            composable(Routes.PLAN) {
+                ReadingPlanScreen(
+                    container = container,
+                    onBack = { navController.popOrHome() },
+                    onOpenBible = { navController.navigate(Routes.BIBLE) },
+                    onOpenEntry = { id -> navController.navigate(Routes.editor(id)) }
+                )
+            }
+
+            composable(Routes.MORE) {
+                MoreScreen(
+                    onOpenInsights = { navController.navigate(Routes.INSIGHTS) },
+                    onOpenMemory = { navController.navigate(Routes.MEMORY) },
+                    onOpenSettings = { navController.navigate(Routes.SETTINGS) }
+                )
+            }
+
+            composable(Routes.MEMORY) {
+                MemoryScreen(
+                    container = container,
+                    onBack = { navController.popOrHome() }
+                )
+            }
+
+            composable(Routes.INSIGHTS) {
+                val vm: InsightsViewModel = viewModel(factory = InsightsViewModel.Factory(container))
+                InsightsScreen(
+                    viewModel = vm,
+                    onBack = { navController.popOrHome() }
+                )
+            }
+
+            composable(Routes.SETTINGS) {
+                SettingsScreen(
+                    container = container,
+                    onBack = { navController.popOrHome() }
+                )
+            }
         }
 
-        composable(Routes.BIBLE) {
-            BibleScreen(
-                container = container,
-                onBack = { navController.popOrHome() },
-                onJournalPassage = { reference, text ->
-                    scope.launch {
-                        val entry = container.repository.getOrCreateTodayEntry(
-                            scriptureReference = reference,
-                            scriptureText = text
-                        )
-                        navController.navigate(Routes.editor(entry.id))
+        if (showBottomBar) {
+            NocturneBottomBar(
+                selected = selectedTab,
+                onSelect = { tab ->
+                    val route = when (tab) {
+                        BottomTab.HOME -> Routes.HOME
+                        BottomTab.BIBLE -> Routes.BIBLE
+                        BottomTab.JOURNAL -> Routes.HISTORY
+                        BottomTab.PLAN -> Routes.PLAN
+                        BottomTab.MORE -> Routes.MORE
+                    }
+                    if (route != currentRoute) {
+                        navController.navigate(route) {
+                            popUpTo(Routes.HOME) { saveState = true }
+                            launchSingleTop = true
+                            restoreState = true
+                        }
                     }
                 }
-            )
-        }
-
-        composable(Routes.PLAN) {
-            ReadingPlanScreen(
-                container = container,
-                onBack = { navController.popOrHome() },
-                onOpenEntry = { id -> navController.navigate(Routes.editor(id)) }
-            )
-        }
-
-        composable(Routes.MEMORY) {
-            MemoryScreen(
-                container = container,
-                onBack = { navController.popOrHome() }
-            )
-        }
-
-        composable(Routes.INSIGHTS) {
-            val vm: InsightsViewModel = viewModel(factory = InsightsViewModel.Factory(container))
-            InsightsScreen(
-                viewModel = vm,
-                onBack = { navController.popOrHome() }
-            )
-        }
-
-        composable(Routes.SETTINGS) {
-            SettingsScreen(
-                container = container,
-                onBack = { navController.popOrHome() }
             )
         }
     }

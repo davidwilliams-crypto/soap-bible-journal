@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 import kotlinx.coroutines.delay
@@ -83,7 +84,7 @@ fun RitualEnter(
     }
 }
 
-/** Quiet scripture quotation block — left margin rule, no card chrome. */
+/** Quiet scripture quotation block — accent rule, outline eyebrow tag, no card chrome. */
 @Composable
 fun ScriptureQuotation(
     eyebrow: String,
@@ -92,25 +93,26 @@ fun ScriptureQuotation(
     footer: (@Composable ColumnScope.() -> Unit)? = null,
     body: @Composable ColumnScope.() -> Unit
 ) {
-    val surfaces = LocalJournalSurfaces.current
     Column(
         modifier = modifier.fillMaxWidth()
     ) {
-        Text(
-            eyebrow.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.secondary
-        )
-        androidx.compose.foundation.layout.Spacer(
-            modifier = Modifier.height(10.dp)
-        )
+        if (eyebrow.isNotBlank()) {
+            Tag(eyebrow, style = TagStyle.Outline)
+            androidx.compose.foundation.layout.Spacer(
+                modifier = Modifier.height(10.dp)
+            )
+        }
         androidx.compose.foundation.layout.Row(modifier = Modifier.fillMaxWidth()) {
             Box(
                 modifier = Modifier
                     .padding(top = 4.dp, end = 14.dp)
                     .width(2.dp)
                     .height(56.dp)
-                    .background(surfaces.margin)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(MaterialTheme.colorScheme.primary, Color.Transparent)
+                        )
+                    )
             )
             Column(modifier = Modifier.weight(1f)) {
                 if (!reference.isNullOrBlank()) {
