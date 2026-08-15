@@ -69,6 +69,7 @@ import com.soapjournal.app.ui.ink.InkCanvas
 import com.soapjournal.app.ui.ink.InkTool
 import com.soapjournal.app.ui.share.AccountabilityShare
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
+import com.soapjournal.app.ui.theme.ScriptureFamily
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -314,7 +315,7 @@ private fun ScripturePane(viewModel: EntryEditorViewModel) {
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Passage") },
             placeholder = { Text("Paste or type the passage") },
-            textStyle = MaterialTheme.typography.bodyLarge,
+            textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = ScriptureFamily),
             minLines = 8,
             maxLines = 16
         )

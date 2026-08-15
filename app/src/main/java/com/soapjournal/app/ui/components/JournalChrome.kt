@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
+import com.soapjournal.app.ui.theme.ScriptureFamily
 import kotlinx.coroutines.delay
 
 /**
@@ -118,7 +119,7 @@ fun ScriptureQuotation(
                 if (!reference.isNullOrBlank()) {
                     Text(
                         reference,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = MaterialTheme.typography.titleSmall.copy(fontFamily = ScriptureFamily),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     androidx.compose.foundation.layout.Spacer(

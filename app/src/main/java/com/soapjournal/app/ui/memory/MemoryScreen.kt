@@ -41,6 +41,7 @@ import com.soapjournal.app.ui.components.ConfirmActionDialog
 import com.soapjournal.app.ui.components.NocturneCard
 import com.soapjournal.app.ui.components.PrimaryButton
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
+import com.soapjournal.app.ui.theme.ScriptureFamily
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -140,6 +141,7 @@ fun MemoryScreen(
                     Text(
                         if (revealed) card.text else "········  ········  ········",
                         style = MaterialTheme.typography.bodyLarge.copy(
+                            fontFamily = ScriptureFamily,
                             fontStyle = if (revealed) FontStyle.Normal else FontStyle.Italic
                         ),
                         color = if (revealed) {
@@ -175,7 +177,7 @@ fun MemoryScreen(
                 onValueChange = { text = it },
                 label = { Text("Verse text") },
                 modifier = Modifier.fillMaxWidth(),
-                textStyle = MaterialTheme.typography.bodyLarge
+                textStyle = MaterialTheme.typography.bodyLarge.copy(fontFamily = ScriptureFamily)
             )
             PrimaryButton(
                 onClick = {

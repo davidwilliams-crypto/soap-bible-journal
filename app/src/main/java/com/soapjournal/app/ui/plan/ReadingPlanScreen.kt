@@ -45,6 +45,7 @@ import com.soapjournal.app.ui.components.SecondaryButton
 import com.soapjournal.app.ui.components.Tag
 import com.soapjournal.app.ui.components.TagStyle
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
+import com.soapjournal.app.ui.theme.ScriptureFamily
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -144,7 +145,7 @@ fun ReadingPlanScreen(
                     passageText.isNotBlank() -> {
                         Text(
                             passageText.take(500) + if (passageText.length > 500) "…" else "",
-                            style = MaterialTheme.typography.bodyLarge
+                            style = MaterialTheme.typography.bodyLarge.copy(fontFamily = ScriptureFamily)
                         )
                     }
                     else -> {

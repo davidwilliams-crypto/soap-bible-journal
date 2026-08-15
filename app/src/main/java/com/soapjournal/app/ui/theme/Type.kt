@@ -4,6 +4,7 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.soapjournal.app.R
@@ -14,6 +15,17 @@ val InterFamily = FontFamily(
     Font(R.font.inter_medium, FontWeight.Medium),
     Font(R.font.inter_semibold, FontWeight.SemiBold),
     Font(R.font.inter_bold, FontWeight.Bold)
+)
+
+/**
+ * Scripture voice — an illuminated-manuscript serif reserved for the Bible text itself
+ * (verse of the day, chapter reading, SOAP scripture pane, memorized verses). Everything
+ * else — chrome, labels, buttons, navigation — stays in [InterFamily].
+ */
+val ScriptureFamily = FontFamily(
+    Font(R.font.garamond_regular, FontWeight.Normal),
+    Font(R.font.garamond_medium, FontWeight.Medium),
+    Font(R.font.garamond_italic, FontWeight.Normal, FontStyle.Italic)
 )
 
 /** Heading weight per Nocturne tokens (font-heading-weight: 500). */

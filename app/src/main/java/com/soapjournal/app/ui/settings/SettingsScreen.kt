@@ -593,7 +593,7 @@ fun SettingsScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    "Typography: Inter (SIL Open Font License).",
+                    "Typography: Inter for chrome and navigation, EB Garamond for Scripture itself (SIL Open Font License).",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

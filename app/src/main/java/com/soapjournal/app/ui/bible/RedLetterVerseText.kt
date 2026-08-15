@@ -14,6 +14,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.TextStyle
 import com.soapjournal.app.data.bible.BibleVerse
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
+import com.soapjournal.app.ui.theme.ScriptureFamily
 
 @Composable
 fun RedLetterVerseText(
@@ -40,6 +41,6 @@ fun RedLetterVerseText(
     Text(
         text = annotated,
         modifier = modifier,
-        style = style
+        style = style.copy(fontFamily = ScriptureFamily)
     )
 }
