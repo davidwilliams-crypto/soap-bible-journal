@@ -49,6 +49,7 @@ import com.soapjournal.app.backup.BackupResult
 import com.soapjournal.app.update.AvailableUpdate
 import com.soapjournal.app.update.InstallPrepResult
 import com.soapjournal.app.update.UpdateCheckResult
+import com.soapjournal.app.data.prefs.liveStreak
 import com.soapjournal.app.ui.components.ConfirmActionDialog
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 import kotlinx.coroutines.launch
@@ -221,9 +222,10 @@ fun SettingsScreen(
             }
 
             SettingsSection("Reminders") {
+                val streak = liveStreak(prefs)
                 Text(
-                    if (prefs.currentStreak > 0) {
-                        "Current rhythm: ${prefs.currentStreak} days · longest ${prefs.longestStreak}"
+                    if (streak > 0) {
+                        "Current rhythm: $streak days · longest ${prefs.longestStreak}"
                     } else {
                         "Gentle nudges — never a scoreboard on your home page."
                     },

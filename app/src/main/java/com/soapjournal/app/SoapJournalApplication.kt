@@ -1,9 +1,11 @@
 package com.soapjournal.app
 
+import android.app.Activity
 import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import android.os.Bundle
 import com.soapjournal.app.notifications.MilestoneNotifier
 import com.soapjournal.app.notifications.ReminderScheduler
 import kotlinx.coroutines.CoroutineScope
@@ -11,6 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicInteger
 
 class SoapJournalApplication : Application() {
     lateinit var container: AppContainer
@@ -18,11 +21,16 @@ class SoapJournalApplication : Application() {
 
     val repository get() = container.repository
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val startedActivities = AtomicInteger(0)
+
+    private val isInForeground: Boolean
+        get() = startedActivities.get() > 0
 
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
         createNotificationChannels()
+        trackForeground()
         appScope.launch {
             container.prefs.ensurePlanStartInitialized()
             val prefs = container.prefs.preferences.first()
@@ -38,9 +46,31 @@ class SoapJournalApplication : Application() {
         }
         appScope.launch {
             container.repository.milestoneEvents.collect { days ->
-                MilestoneNotifier.celebrate(this@SoapJournalApplication, days)
+                // The editor shows its own celebration dialog, so only notify when the
+                // app isn't visible (e.g. the entry completed via a background flush).
+                if (!isInForeground) {
+                    MilestoneNotifier.celebrate(this@SoapJournalApplication, days)
+                }
             }
         }
+    }
+
+    private fun trackForeground() {
+        registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
+            override fun onActivityStarted(activity: Activity) {
+                startedActivities.incrementAndGet()
+            }
+
+            override fun onActivityStopped(activity: Activity) {
+                startedActivities.decrementAndGet()
+            }
+
+            override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+            override fun onActivityResumed(activity: Activity) = Unit
+            override fun onActivityPaused(activity: Activity) = Unit
+            override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+            override fun onActivityDestroyed(activity: Activity) = Unit
+        })
     }
 
     private fun createNotificationChannels() {

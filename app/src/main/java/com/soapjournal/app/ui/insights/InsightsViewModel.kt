@@ -31,7 +31,9 @@ class InsightsViewModel(container: AppContainer) : ViewModel() {
 
     val heatmapDays: StateFlow<Set<Long>> = run {
         val today = LocalDate.now()
-        val since = today.minusWeeks(INSIGHTS_HEATMAP_WEEKS.toLong())
+        // Fetch 6 extra days so the grid's Sunday-aligned first column (which can
+        // reach back past the nominal window) never renders real entries as missed.
+        val since = today.minusWeeks(INSIGHTS_HEATMAP_WEEKS.toLong()).minusDays(6)
         repository.observeHeatmapDays(since.toEpochDay())
             .map { it.toSet() }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())

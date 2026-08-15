@@ -335,3 +335,22 @@ fun freezesAvailable(prefs: UserPreferences, today: LocalDate = LocalDate.now())
     val used = if (prefs.freezeWeekKey == weekKey) prefs.freezesUsedInWeek else 0
     return (1 - used).coerceIn(0, 1)
 }
+
+/**
+ * The streak as it stands right now. [UserPreferences.currentStreak] only updates on
+ * completion, so a broken streak lingers in prefs indefinitely; anything that displays
+ * or acts on the current streak must read it through this. Alive means the last
+ * completion was today or yesterday, or two days ago with a freeze still available
+ * to cover the single missed day.
+ */
+fun liveStreak(prefs: UserPreferences, today: LocalDate = LocalDate.now()): Int {
+    val day = today.toEpochDay()
+    val last = prefs.lastCompletedEpochDay
+    val alive = when {
+        last < 0 -> false
+        day - last <= 1 -> true
+        day - last == 2L && freezesAvailable(prefs, LocalDate.ofEpochDay(last + 1)) > 0 -> true
+        else -> false
+    }
+    return if (alive) prefs.currentStreak else 0
+}
