@@ -56,7 +56,11 @@ class AppContainer(context: Context) {
         scope.launch {
             prefs.preferences
                 .distinctUntilChangedBy { Triple(it.currentStreak, it.cachedVotdText, it.cachedVotdEpochDay) }
-                .collect { updated -> SoapWidgetProvider.updateAll(appContext, updated) }
+                .collect { updated ->
+                    // Widget refresh is best-effort; a RemoteViews failure must not
+                    // kill this scope (or the process).
+                    runCatching { SoapWidgetProvider.updateAll(appContext, updated) }
+                }
         }
     }
 }

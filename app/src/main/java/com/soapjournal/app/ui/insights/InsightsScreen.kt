@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.soapjournal.app.data.prefs.STREAK_MILESTONES
 import com.soapjournal.app.data.prefs.freezesAvailable
+import com.soapjournal.app.data.prefs.liveStreak
 import com.soapjournal.app.ui.theme.LocalJournalSurfaces
 import java.time.LocalDate
 
@@ -53,6 +54,7 @@ fun InsightsScreen(
     val heatmapDays by viewModel.heatmapDays.collectAsStateWithLifecycle()
     val surfaces = LocalJournalSurfaces.current
     val freezes = freezesAvailable(prefs)
+    val streak = liveStreak(prefs)
 
     Scaffold(
         containerColor = surfaces.paper,
@@ -76,12 +78,12 @@ fun InsightsScreen(
                 .padding(horizontal = 24.dp, vertical = 8.dp)
         ) {
             Text(
-                "${prefs.currentStreak}",
+                "$streak",
                 style = MaterialTheme.typography.displayLarge,
                 color = MaterialTheme.colorScheme.onBackground
             )
             Text(
-                if (prefs.currentStreak == 1) "day rhythm" else "day rhythm, keep going",
+                if (streak == 1) "day rhythm" else "day rhythm, keep going",
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

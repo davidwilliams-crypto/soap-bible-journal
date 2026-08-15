@@ -12,6 +12,7 @@ import com.soapjournal.app.MainActivity
 import com.soapjournal.app.R
 import com.soapjournal.app.SoapJournalApplication
 import com.soapjournal.app.data.prefs.UserPreferences
+import com.soapjournal.app.data.prefs.liveStreak
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -33,6 +34,9 @@ class SoapWidgetProvider : AppWidgetProvider() {
                 val app = context.applicationContext as SoapJournalApplication
                 val prefs = app.container.prefs.preferences.first()
                 appWidgetIds.forEach { id -> updateWidget(context, appWidgetManager, id, prefs) }
+            } catch (_: Throwable) {
+                // A failed refresh keeps the last rendered state; a periodic widget
+                // update must never take the whole process down.
             } finally {
                 pendingResult.finish()
             }
@@ -59,10 +63,13 @@ class SoapWidgetProvider : AppWidgetProvider() {
             prefs: UserPreferences
         ) {
             val views = RemoteViews(context.packageName, R.layout.widget_soap)
+            // liveStreak, not currentStreak: a broken streak lingers in prefs, and the
+            // widget must not keep advertising a rhythm that already ended.
+            val streak = liveStreak(prefs)
             views.setTextViewText(
                 R.id.widget_streak,
-                if (prefs.currentStreak > 0) {
-                    "${prefs.currentStreak}-day rhythm"
+                if (streak > 0) {
+                    "$streak-day rhythm"
                 } else {
                     "Begin today's SOAP"
                 }

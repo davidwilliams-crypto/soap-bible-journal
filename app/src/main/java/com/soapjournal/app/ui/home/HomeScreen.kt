@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.soapjournal.app.data.plan.ReadingPlan
+import com.soapjournal.app.data.prefs.liveStreak
 import com.soapjournal.app.ui.bible.RedLetterVerseText
 import com.soapjournal.app.ui.components.JournalAtmosphere
 import com.soapjournal.app.ui.components.RitualEnter
@@ -264,10 +265,11 @@ fun HomeScreen(
                     TextButton(onClick = onOpenInsights) { Text("Insights") }
                 }
 
-                if (prefs.currentStreak > 0) {
+                val streak = liveStreak(prefs)
+                if (streak > 0) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "${prefs.currentStreak}-day rhythm · longest ${prefs.longestStreak}",
+                        "$streak-day rhythm · longest ${prefs.longestStreak}",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                         modifier = Modifier.clickable(onClick = onOpenInsights)
